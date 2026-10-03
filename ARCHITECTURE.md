@@ -287,3 +287,30 @@ non è stata verificata né promessa la compatibilità Monado Windows/MSFS.
 Nessun runtime Monado introdotto in M1. Nessun PS Move/Camera/room-scale.
 
 **Fine sessione: fermarsi dopo M1 anche se il dispositivo è già presente.**
+
+## 10. Evoluzione verificata in M2 (sessione successiva autorizzata)
+
+Controllo Windows risolto con binding misto: **MI_04 HID/HIDAPI, MI_05
+WinUSB/API nativa**. Cambio manuale autorizzato via Zadig; inventario/ripristino
+in `docs/WINUSB_CONTROL.md`. Default diagnostico passivo; scritture esplicite
+solo power 0x17 e mode 0x23, header gp_id=0 come libpsvr.
+
+Descriptor reali: controllo class HID 3, alternate 0, interrupt IN 0x84 e
+OUT 0x04, max packet 64. WinUSB accede ai pipe USB anche se il descriptor
+report HID Windows non dichiara output standard. GUID/path scoperti dalla
+registrazione dell'esatta MI_05, non hardcoded.
+
+F0 reale: **20 byte/payload16**; `libpsvr/Device_Status.h` descrive solo i primi
+campi, non il frame completo. Conferma: PSVRFramework
+`ccda7ca840f8f820197dd8571bbc869a02563ea4`, `PSVR.cs` e
+[wiki F0](https://github.com/gusmanb/PSVRFramework/wiki/Report-0xF0---PSVR-Status).
+Mask byte4: power bit0, worn bit1, cinema bit2; VR active byte11.
+A0 reale: 64 byte/payload60, command ID byte4, result byte5 (0=accettato).
+F0 su cambi/eventi, non polling continuo.
+
+M2 richiede write completo + A0 corrispondente accettato + F0 successivo
+coerente. Prima del comando drenaggio passivo limitato; nessun vendor query,
+reset o retry automatico. VR/cinema devono concordare entrambi i flag:
+aggiornamento in due fasi a ~1 s di distanza; power-on ~2 s. Timeout/stato
+sconosciuto distinti da I/O fallito; nessun successo dedotto dal solo ACK.
+Dettagli nel [report M2](docs/MILESTONE_2_REPORT.md). M3 non iniziata.

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.24)
-project(psvr_pc VERSION 0.1.0 LANGUAGES C CXX)
+project(psvr_pc VERSION 0.2.0 LANGUAGES C CXX)
 
 if(NOT WIN32 OR NOT CMAKE_SIZEOF_VOID_P EQUAL 8)
     message(FATAL_ERROR "PSVR-PC milestone 1 requires Windows x64")
@@ -24,8 +24,8 @@ FetchContent_MakeAvailable(hidapi nlohmann_json)
 add_library(psvr_diag_core INTERFACE)
 target_include_directories(psvr_diag_core INTERFACE tools/psvr_diag)
 target_link_libraries(psvr_diag_core INTERFACE nlohmann_json::nlohmann_json)
-add_executable(psvr_diag tools/psvr_diag/main.cpp tools/psvr_diag/pnp_windows.cpp)
-target_link_libraries(psvr_diag PRIVATE psvr_diag_core hidapi::winapi setupapi cfgmgr32 hid)
+add_executable(psvr_diag tools/psvr_diag/main.cpp tools/psvr_diag/pnp_windows.cpp tools/psvr_diag/control_windows.cpp)
+target_link_libraries(psvr_diag PRIVATE psvr_diag_core hidapi::winapi setupapi cfgmgr32 hid winusb ole32 advapi32)
 target_compile_definitions(psvr_diag PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX UNICODE _UNICODE)
 if(MSVC)
     target_compile_options(psvr_diag PRIVATE /W4 /permissive- /utf-8)
@@ -44,12 +44,14 @@ if(BUILD_TESTING)
     add_test(NAME diag_core COMMAND psvr_diag_tests)
     add_test(NAME diag_help COMMAND psvr_diag --help)
     set_tests_properties(diag_help PROPERTIES PASS_REGULAR_EXPRESSION "Passive PSVR1")
-    foreach(case unknown_option missing_config invalid_config)
+    foreach(case unknown_option missing_config invalid_config conflicting_actions enumerate_action dry_run_without_action)
         add_test(NAME diag_${case} COMMAND ${CMAKE_COMMAND}
             -DDIAG=$<TARGET_FILE:psvr_diag> -DCASE=${case}
             -DFIXTURE=${CMAKE_CURRENT_SOURCE_DIR}/tests/invalid_config.json
             -P ${CMAKE_CURRENT_SOURCE_DIR}/tests/check_exit.cmake)
     endforeach()
+    add_test(NAME diag_power_dry_run COMMAND psvr_diag --power-on --dry-run --log-dir ${CMAKE_CURRENT_BINARY_DIR}/test-logs)
+    set_tests_properties(diag_power_dry_run PROPERTIES PASS_REGULAR_EXPRESSION "packet=17 00 aa 04 01 00 00 00; hardware not opened")
 endif()
 
 install(TARGETS psvr_diag RUNTIME DESTINATION .)

@@ -8,6 +8,7 @@
 #include <string>
 #include <vector>
 #include <nlohmann/json.hpp>
+#include "control_protocol.hpp"
 
 namespace psvr {
 constexpr unsigned short vendor_id = 0x054c;
@@ -19,10 +20,13 @@ struct Options {
     int duration_ms = 2000;
     int read_timeout_ms = 100;
     int raw_packets = 3;
+    int control_timeout_ms = 3000;
     std::string log_dir = "logs";
     std::string verbosity = "info";
     bool enumerate_only = false;
     bool all_devices = false;
+    Action action = Action::none;
+    bool dry_run = false;
 };
 
 inline int bounded_integer(const std::string& value, int low, int high) {
@@ -38,9 +42,12 @@ inline int bounded_integer(const std::string& value, int low, int high) {
 inline void validate_options(const Options& o) {
     if (o.duration_ms < 100 || o.duration_ms > 60000 ||
         o.read_timeout_ms < 1 || o.read_timeout_ms > 1000 ||
-        o.raw_packets < 0 || o.raw_packets > 100 || o.log_dir.empty() ||
+        o.raw_packets < 0 || o.raw_packets > 100 || o.control_timeout_ms < 100 ||
+        o.control_timeout_ms > 15000 || o.log_dir.empty() ||
         (o.verbosity != "info" && o.verbosity != "debug"))
-        throw std::runtime_error("invalid diagnostic config: duration=100..60000, timeout=1..1000, raw=0..100, verbosity=info/debug");
+        throw std::runtime_error("invalid diagnostic config: duration=100..60000, timeout=1..1000, control_timeout=100..15000, raw=0..100, verbosity=info/debug");
+    if (o.enumerate_only && o.action != Action::none) throw std::runtime_error("action cannot be combined with --enumerate-only");
+    if (o.dry_run && !writes_command(o.action)) throw std::runtime_error("--dry-run requires one power/mode action");
 }
 
 inline void check_keys(const nlohmann::json& j, const std::vector<std::string>& allowed) {
@@ -56,7 +63,7 @@ inline Options config_options(const nlohmann::json& j) {
         j.at("schema_version") != 1)
         throw std::runtime_error("schema_version must be integer 1");
     const auto& d = j.at("diagnostic");
-    check_keys(d, {"duration_ms", "read_timeout_ms", "raw_packets", "log_dir", "logging_verbosity"});
+    check_keys(d, {"duration_ms", "read_timeout_ms", "control_timeout_ms", "raw_packets", "log_dir", "logging_verbosity"});
     Options o;
     auto integer = [&](const char* key, int& destination) {
         if (!d.contains(key)) return;
@@ -68,6 +75,7 @@ inline Options config_options(const nlohmann::json& j) {
     integer("duration_ms", o.duration_ms);
     integer("read_timeout_ms", o.read_timeout_ms);
     integer("raw_packets", o.raw_packets);
+    integer("control_timeout_ms", o.control_timeout_ms);
     if (d.contains("log_dir")) o.log_dir = d.at("log_dir").get<std::string>();
     if (d.contains("logging_verbosity")) o.verbosity = d.at("logging_verbosity").get<std::string>();
     validate_options(o);

@@ -1,6 +1,32 @@
 # Stato del progetto
 
-## Sessione 2026-10-03
+## Sessione M2 — 2026-10-03
+
+- **M2 completata, verificata sul PSVR reale.** Comandi espliciti `--power-on`,
+  `--power-off`, `--vr-mode`, `--cinema-mode`; pacchetti documentati di 8 byte,
+  verifica con risposta A0 accettata e nuovo F0.
+- Autorizzazione dell'utente e installazione manuale Zadig: **solo MI_05** da
+  HidUsb/input.inf a **WinUSB/oem88.inf**. MI_04 resta HidUsb/input.inf;
+  composite e audio invariati. Inventario originale in `logs/`, ripristino
+  documentato in `docs/WINUSB_CONTROL.md`.
+- Endpoint rilevati: **IN 0x84 / OUT 0x04**, interrupt, max packet 64.
+  Backend WinUSB nativo, nessuna dipendenza libusb.
+- Power-off: mask **0x64**; power-on **0x15**;
+  VR **0x51, vr_active=1**; cinema **0x55, vr_active=0**; exit 0 per ogni cambio.
+- Stato finale: **visore acceso in cinema mode**.
+- Regressione passiva M1 col binding misto: **2002 report validi in 2 s**, 0
+  discontinuità/rifiuti, exit 0. Build x64 MinGW riuscita, **9/9 test passati**.
+- **M3–M10 non iniziate.** Prossimo passo: IMU/fusion 3DoF e recenter.
+
+Report: [docs/MILESTONE_2_REPORT.md](docs/MILESTONE_2_REPORT.md).
+`--status` osserva passivamente eventi, non fa polling: senza nuovo F0
+termina **6 / stato sconosciuto**. Anche un comando già soddisfatto può non
+produrre F0: ACK da solo non diventa successo di verifica.
+Ripristino del binding HID, hot-unplug durante I/O e Ctrl+C non provati
+fisicamente nella sessione M2. VS 2022 e Windows 10 ancora non verificati.
+Verifica display/SteamVR resta alle sue milestone. **Sessione conclusa a M2.**
+
+## Sessione M0/M1 — 2026-10-03 (storico)
 
 - **M0: analisi completata.** Revisioni, sorgenti, compatibilità e rischi in
   `ARCHITECTURE.md`. Ambiente iniziale: repository vuoto, Windows 11 Pro x64
@@ -12,7 +38,7 @@
   in 5 s**, 0 rifiutati, 0 discontinuità, ~1000.20 report/s e ~2000.41 campioni/s.
   Exit **0**. USB scollegato fisicamente: exit **2**, nessun crash.
   Ricollegato: **2001 report in 2 s**, exit **0**, nessuna discontinuità.
-- **M2–M10: non iniziate.** Nessun comando power/VR, driver SteamVR o tracking.
+- Al termine della prima sessione **M2–M10 non iniziate**.
 
 ## Limiti verificati e gate successivo
 
@@ -32,4 +58,5 @@
 
 Report con comandi/output e log: [docs/MILESTONE_1_REPORT.md](docs/MILESTONE_1_REPORT.md).
 Commit M0: `80debcb`. M1 ha un commit dedicato nella cronologia Git.
-**Sessione conclusa alla milestone 1; M2 solo su nuova istruzione.**
+La prima sessione si è conclusa a M1; la successiva istruzione "procedi" ha
+avviato M2, riportata sopra. Il commit M2 dedicato è nella cronologia Git.

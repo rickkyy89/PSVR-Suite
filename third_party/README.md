@@ -14,3 +14,11 @@ revisioni immutabili e conservate in `build/<toolchain>/_deps/`.
 
 Non copiato codice da OpenPSVR (AGPL) né dagli esperimenti mSparks (licenze
 per file e assenza LICENSE globale). Nessun binario upstream usato come driver.
+
+M2 aggiunge soltanto **WinUSB nativo Windows**, nessuna dipendenza di build.
+`control_protocol.hpp` implementa indipendentemente valori power/mode da
+OpenHMD/libpsvr e F0/A0 da libpsvr/PSVRFramework. Riferimento supplementare:
+`gusmanb/PSVRFramework` revisione `ccda7ca840f8f820197dd8571bbc869a02563ea4`,
+`PSVRFramework/PSVR.cs` e wiki F0/USB Command Response Format: consultati,
+non copiati come sorgenti. Zadig 2.9 è un tool esterno GPLv3 usato dall'utente
+per cambiare MI_05; non distribuito nel pacchetto né invocato dalla build.

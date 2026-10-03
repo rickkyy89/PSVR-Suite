@@ -2,6 +2,7 @@
 #include "diag_core.hpp"
 #include "sensor_packet.hpp"
 #include "pnp_windows.hpp"
+#include "control_windows.hpp"
 #include <windows.h>
 #include <hidsdi.h>
 #include <hidapi.h>
@@ -68,14 +69,19 @@ struct HidSession {
 };
 
 void help() {
-    std::cout << "Passive PSVR1 USB/HID diagnostic (Windows x64), milestone 1\n"
+    std::cout << "Passive PSVR1 diagnostic by default; explicit M2 power/mode actions (Windows x64)\n"
         "Usage: psvr_diag [--config file.json] [--duration-ms 100..60000]\n"
         "                 [--read-timeout-ms 1..1000] [--raw-packets 0..100]\n"
         "                 [--log-dir directory] [--enumerate-only] [--all-devices]\n"
-        "No power, mode, feature/output report or firmware commands are sent.\n"
+        "                 [--control-info | --status | --power-on | --power-off |\n"
+        "                  --vr-mode | --cinema-mode] [--control-timeout-ms 100..15000]\n"
+        "                 [--dry-run (power/mode only: print bytes, never open USB)]\n"
+        "M2 requires WinUSB on PSVR interface 5; sensors stay HID on interface 4.\n"
+        "Only power (0x17) and VR/cinema (0x23) writes are supported; no firmware commands.\n"
         "Config is explicit; CLI options override it regardless of argument order.\n"
         "Exit: 0=PASS, 1=usage/config/internal, 2=absent, 3=interface/I/O,\n"
-        "      4=no valid sensor report, 130=interrupted.\n";
+        "      4=no valid sensor report, 5=WinUSB control driver needed,\n"
+        "      6=state unverified, 130=interrupted. --control-info is read-only.\n";
 }
 
 psvr::Options parse_options(int argc, char** argv) {
@@ -84,9 +90,9 @@ psvr::Options parse_options(int argc, char** argv) {
     // First validate the whole command line and find explicit config; no hardware access.
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--enumerate-only" || arg == "--all-devices") continue;
+        if (arg == "--enumerate-only" || arg == "--all-devices" || arg == "--dry-run" || psvr::parse_action(arg)) continue;
         if (arg != "--config" && arg != "--duration-ms" && arg != "--read-timeout-ms" &&
-            arg != "--raw-packets" && arg != "--log-dir")
+            arg != "--raw-packets" && arg != "--log-dir" && arg != "--control-timeout-ms")
             throw std::runtime_error("unknown option: " + arg);
         if (++i >= argc) throw std::runtime_error("missing value for " + arg);
         if (arg == "--config") {
@@ -105,9 +111,16 @@ psvr::Options parse_options(int argc, char** argv) {
         const std::string arg = argv[i];
         if (arg == "--enumerate-only") { options.enumerate_only = true; continue; }
         if (arg == "--all-devices") { options.all_devices = true; continue; }
+        if (arg == "--dry-run") { options.dry_run = true; continue; }
+        if (const auto action = psvr::parse_action(arg)) {
+            if (options.action != psvr::Action::none) throw std::runtime_error("only one control action may be specified");
+            options.action = *action;
+            continue;
+        }
         const std::string value = argv[++i];
         if (arg == "--duration-ms") options.duration_ms = psvr::bounded_integer(value, 100, 60000);
         if (arg == "--read-timeout-ms") options.read_timeout_ms = psvr::bounded_integer(value, 1, 1000);
+        if (arg == "--control-timeout-ms") options.control_timeout_ms = psvr::bounded_integer(value, 100, 15000);
         if (arg == "--raw-packets") options.raw_packets = psvr::bounded_integer(value, 0, 100);
         if (arg == "--log-dir") options.log_dir = value;
     }
@@ -120,6 +133,91 @@ std::string hex_bytes(const unsigned char* buffer, int count) {
     s << std::hex << std::setfill('0');
     for (int i = 0; i < count; ++i) s << (i ? " " : "") << std::setw(2) << unsigned(buffer[i]);
     return s.str();
+}
+
+std::string status_text(const psvr::ControlStatus& status) {
+    std::ostringstream s;
+    s << "power=" << (status.powered() ? "on" : "off")
+      << " mode=" << (status.cinematic() ? "cinema" : "vr")
+      << " worn=" << (status.worn() ? "true" : "false")
+      << " vr_active=" << unsigned(status.vr_active)
+      << " status_mask=0x" << std::hex << unsigned(status.mask);
+    if (!status.powered()) s << " (mode flag does not prove active display while powered off)";
+    return s.str();
+}
+
+int control_action(psvr::WinUsbControl& control, const psvr::Options& options, Logger& log) {
+    if (options.action == psvr::Action::control_info) {
+        log.write("INFO", "control-info complete: descriptors only, no command sent");
+        return 0;
+    }
+    const bool writing = psvr::writes_command(options.action);
+    bool acknowledged = false;
+    if (writing) {
+        // Do not verify a new command against stale queued statuses. No reset,
+        // no vendor query: bounded passive drain, then exactly one explicit write.
+        unsigned drained = 0;
+        for (; drained < 32 && !interrupted.load(); ++drained) {
+            const auto bytes = control.read(10);
+            if (bytes.empty()) break;
+            if (const auto status = psvr::decode_status(bytes.data(), bytes.size()))
+                log.write("INFO", "pre-command status " + status_text(*status));
+        }
+        if (interrupted.load()) return 130;
+        if (drained == 32) {
+            log.write("ERROR", "control input queue did not drain; command not sent");
+            return 6;
+        }
+        log.write("INFO", "control stale frames drained=" + std::to_string(drained));
+        const auto packet = psvr::command_packet(options.action);
+        log.write("INFO", std::string("command requested action=") + psvr::action_name(options.action) +
+            " full_usb_packet=" + hex_bytes(packet.data(), static_cast<int>(packet.size())));
+        const auto sent = control.send(options.action, 1000);
+        log.write("INFO", "command transfer OK bytes=" + std::to_string(sent) + " state_verified=false (waiting for fresh F0 status)");
+    } else {
+        log.write("INFO", "status observation started: passive USB IN, no query/write command");
+    }
+    const auto deadline = Clock::now() + std::chrono::milliseconds(options.control_timeout_ms);
+    unsigned frames = 0;
+    std::optional<psvr::ControlStatus> latest;
+    while (Clock::now() < deadline && !interrupted.load()) {
+        const auto remaining = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now()).count();
+        const auto bytes = control.read(static_cast<int>(std::max<long long>(1, std::min<long long>(100, remaining))));
+        if (bytes.empty()) continue;
+        ++frames;
+        if (frames <= static_cast<unsigned>(options.raw_packets))
+            log.write("INFO", "control USB IN length=" + std::to_string(bytes.size()) + " hex=" + hex_bytes(bytes.data(), static_cast<int>(bytes.size())));
+        if (writing) {
+            if (const auto response = psvr::decode_response(bytes.data(), bytes.size())) {
+                if (response->command_id == psvr::command_packet(options.action)[0]) {
+                    log.write(response->result_code ? "ERROR" : "INFO", "command response result_code=" +
+                        std::to_string(response->result_code) + " (0=accepted; not a display-state verification)");
+                    if (response->result_code) return 3;
+                    acknowledged = true;
+                }
+            }
+        }
+        const auto status = psvr::decode_status(bytes.data(), bytes.size());
+        if (!status) {
+            if (bytes.size() && bytes[0] == 0xf0)
+                log.write("WARN", "F0 status rejected: envelope/length differs from documented format");
+            if (!writing || !psvr::action_verified(options.action, latest, acknowledged)) continue;
+        } else {
+            if (!latest || latest->mask != status->mask || latest->vr_active != status->vr_active)
+                log.write("INFO", "control status " + status_text(*status));
+            latest = status;
+        }
+        if (!writing || psvr::action_verified(options.action, latest, acknowledged)) {
+            log.write("INFO", writing ? std::string("MILESTONE 2 action verified: ") + psvr::action_name(options.action) +
+                " (accepted A0 response + fresh F0 state after successful transfer)" : "status observed successfully");
+            return 0;
+        }
+    }
+    if (interrupted.load()) return 130;
+    log.write("WARN", std::string(writing ? "command sent but requested state NOT verified" : "current state unknown: no valid F0 status") +
+        " timeout_ms=" + std::to_string(options.control_timeout_ms) + " received_frames=" + std::to_string(frames) +
+        (latest ? " latest=" + status_text(*latest) : "") + "; no retry or inferred success");
+    return 6;
 }
 
 HidHandle open_interface(const hid_device_info& info, const char* role, Logger& log, bool& supports_input) {
@@ -223,26 +321,32 @@ int capture(hid_device* sensor, hid_device* control, bool control_supports_input
         << " elapsed_s=" << seconds << " report_hz=" << reports / seconds
         << " samples_hz_estimate=" << (2 * valid) / seconds;
     log.write("INFO", summary.str());
-    log.write("INFO", "control summary reports=" + std::to_string(control_reports) + " (passive timeout is allowed)");
+    log.write("INFO", "control summary reports=" + std::to_string(control_reports) +
+        (control_supports_input ? " (passive timeout is allowed)" : " (input not consumed during sensor-only capture)"));
     if (interrupted.load()) return 130;
     if (io_failed) return 3;
     if (valid == 0) {
         log.write("WARN", "MILESTONE 1 INCOMPLETE: no valid 64-byte sensor reports; check physical power/cables and repeat");
         return 4;
     }
-    log.write("INFO", "MILESTONE 1 PASS: HID 4/5 open and sensor reports received; power/mode/orientation/display untested");
+    log.write("INFO", "MILESTONE 1 PASS: sensor HID 4 + control interface 5 open and sensor reports received; passive capture only");
     return 0;
 }
 
 int diagnose(const psvr::Options& options, Logger& log) {
     HidSession session;
-    log.write("INFO", std::string("psvr_diag 0.1.0 x64 HIDAPI=") + hid_version_str() + " passive=true");
+    log.write("INFO", std::string("psvr_diag 0.2.0 x64 HIDAPI=") + hid_version_str() + " action=" + psvr::action_name(options.action));
     log.write("INFO", "USB detection started");
     const auto usb = psvr::enumerate_usb();
     unsigned int matches = 0, composite_devices = 0;
+    const psvr::PnpDevice* control_pnp = nullptr;
     for (const auto& device : usb) {
         if (device.is_psvr) ++matches;
         if (device.is_composite) ++composite_devices;
+        if (device.is_psvr && device.instance_id.find("&MI_05\\") != std::string::npos) {
+            if (control_pnp) throw std::runtime_error("ambiguous MI_05 PnP nodes");
+            control_pnp = &device;
+        }
         if (device.is_psvr || options.all_devices) {
             log.write(device.is_psvr && device.problem ? "WARN" : "INFO",
                 "USB PnP id=" + device.instance_id + " name=" + device.name + " service=" + device.service +
@@ -296,25 +400,62 @@ int diagnose(const psvr::Options& options, Logger& log) {
         log.write("ERROR", "ambiguous PSVR sensor/control interfaces; connect one processor unit only");
         return 3;
     }
-    if (selection != psvr::Selection::ready || !sensor_info || !control_info) {
-        log.write("ERROR", "required HID interfaces missing: sensor=4 control=5; check Windows HID bindings/service and competing drivers");
+    if (!sensor_info || !sensor_info->path || !control_pnp) {
+        log.write("ERROR", "required PSVR interfaces missing: sensor=4 HID, control=5 PnP; check bindings/service");
         return 3;
     }
-    if (!sensor_info->path || !control_info->path) throw std::runtime_error("selected HID path missing");
-    log.write("INFO", "HID open started (only PSVR interfaces 4/5)");
+    std::unique_ptr<psvr::WinUsbControl> usb_control;
+    if (_stricmp(control_pnp->service.c_str(), "WinUSB") == 0) {
+        if (control_pnp->problem || control_pnp->status_result) {
+            log.write("ERROR", "MI_05 WinUSB PnP status not healthy");
+            return 3;
+        }
+        try {
+            usb_control = std::make_unique<psvr::WinUsbControl>(control_pnp->instance_id);
+        } catch (const std::exception& error) {
+            log.write("ERROR", std::string("WinUSB control open failed: ") + error.what() + "; command NOT sent");
+            return 3;
+        }
+        log.write("INFO", usb_control->description());
+        log.write("INFO", "control interface OK interface=5 transport=WinUSB (no command sent on open)");
+    }
+    if (options.action != psvr::Action::none) {
+        if (!usb_control) {
+            log.write("ERROR", "M2 requires WinUSB on MI_05; current service=" + control_pnp->service +
+                "; command NOT sent; see docs/WINUSB_CONTROL.md (MI_04 stays HID)");
+            return 5;
+        }
+        int result = 3;
+        try {
+            result = control_action(*usb_control, options, log);
+        } catch (const std::exception& error) {
+            log.write("ERROR", std::string("WinUSB control I/O failed: ") + error.what() +
+                "; see last transfer entry for whether command was sent; no automatic retry");
+        }
+        usb_control.reset();
+        log.write("INFO", "WinUSB control handle closed; no automatic power/mode rollback");
+        return result;
+    }
+    if (!usb_control && (!control_info || !control_info->path || selection != psvr::Selection::ready)) {
+        log.write("ERROR", "control 5 has neither accessible HID nor WinUSB binding");
+        return 3;
+    }
+    log.write("INFO", "passive HID open started (sensor=4; control HID only if WinUSB not used)");
     bool sensor_supports_input = false, control_supports_input = false;
     auto sensor = open_interface(*sensor_info, "sensor", log, sensor_supports_input);
-    auto control = open_interface(*control_info, "control", log, control_supports_input);
-    if (!sensor || !control) return 3;
+    HidHandle control;
+    if (!usb_control) control = open_interface(*control_info, "control", log, control_supports_input);
+    if (!sensor || (!control && !usb_control)) return 3;
     if (!sensor_supports_input) {
         log.write("ERROR", "sensor HID descriptor has no input reports");
         return 3;
     }
-    if (!control_supports_input) log.write("INFO", "control descriptor exposes no input reports; passive control read skipped");
+    if (!control_supports_input) log.write("INFO", "passive sensor capture: control input not consumed (no commands)");
     const auto result = capture(sensor.get(), control.get(), control_supports_input, options, log);
     sensor.reset();
     control.reset();
-    log.write("INFO", "HID handles closed (no mode/power changes)");
+    usb_control.reset();
+    log.write("INFO", "sensor/control handles closed (passive; no mode/power changes)");
     return result;
 }
 } // namespace
@@ -328,7 +469,15 @@ int main(int argc, char** argv) {
         log = std::make_unique<Logger>(options.log_dir);
         log->write("INFO", "config effective duration_ms=" + std::to_string(options.duration_ms) +
             " read_timeout_ms=" + std::to_string(options.read_timeout_ms) + " raw_packets=" +
-            std::to_string(options.raw_packets) + " verbosity=" + options.verbosity);
+            std::to_string(options.raw_packets) + " verbosity=" + options.verbosity +
+            " control_timeout_ms=" + std::to_string(options.control_timeout_ms));
+        if (options.dry_run) {
+            const auto bytes = psvr::command_packet(options.action);
+            log->write("INFO", std::string("dry-run action=") + psvr::action_name(options.action) + " packet=" +
+                hex_bytes(bytes.data(), static_cast<int>(bytes.size())) + "; hardware not opened, command NOT sent");
+            log->write("INFO", "shutdown exit_code=0 (dry-run only)");
+            return 0;
+        }
         if (!SetConsoleCtrlHandler(console_control, TRUE)) throw std::runtime_error("cannot register Ctrl+C handler");
         const int result = diagnose(options, *log);
         SetConsoleCtrlHandler(console_control, FALSE);
@@ -340,7 +489,7 @@ int main(int argc, char** argv) {
             try { log->write("ERROR", std::string(error.what()) + "; shutdown exit_code=1"); }
             catch (...) { std::cerr << "ERROR: logging also failed\n"; }
         }
-        std::cerr << "ERROR: " << error.what() << "\nUse psvr_diag --help. No power/mode commands were sent.\n";
+        std::cerr << "ERROR: " << error.what() << "\nUse psvr_diag --help; see log for last completed operation.\n";
         return 1;
     }
 }

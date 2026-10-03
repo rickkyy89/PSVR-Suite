@@ -3,6 +3,7 @@
   "diagnostic": {
     "duration_ms": 2000,
     "read_timeout_ms": 100,
+    "control_timeout_ms": 3000,
     "raw_packets": 3,
     "log_dir": "logs",
     "logging_verbosity": "info"

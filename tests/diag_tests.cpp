@@ -56,9 +56,50 @@ int main() {
         rejects([&] { psvr::config_options(j); }, "unknown config accepted");
         rejects([] { psvr::bounded_integer("100ms", 100, 60000); }, "CLI junk accepted");
         rejects([] { psvr::bounded_integer("-100", 100, 60000); }, "CLI negative accepted");
+        const std::array<unsigned char, 8> power_on{{0x17, 0, 0xaa, 4, 1, 0, 0, 0}};
+        const std::array<unsigned char, 8> power_off{{0x17, 0, 0xaa, 4, 0, 0, 0, 0}};
+        const std::array<unsigned char, 8> vr{{0x23, 0, 0xaa, 4, 1, 0, 0, 0}};
+        const std::array<unsigned char, 8> cinema{{0x23, 0, 0xaa, 4, 0, 0, 0, 0}};
+        check(psvr::command_packet(psvr::Action::power_on) == power_on, "wrong power-on wire packet");
+        check(psvr::command_packet(psvr::Action::power_off) == power_off, "wrong power-off wire packet");
+        check(psvr::command_packet(psvr::Action::vr_mode) == vr, "wrong VR wire packet");
+        check(psvr::command_packet(psvr::Action::cinema_mode) == cinema, "wrong cinema wire packet");
+        rejects([] { psvr::command_packet(psvr::Action::status); }, "status action produces write");
+        rejects([] { psvr::command_packet(static_cast<psvr::Action>(999)); }, "unknown action produces write");
+        std::array<unsigned char, 64> f0{};
+        f0[0] = 0xf0; f0[2] = 0xaa; f0[3] = 16; f0[4] = 0x05;
+        const auto state = psvr::decode_status(f0.data(), 20);
+        check(state && state->powered() && state->cinematic() && !state->worn(), "F0 flags wrong");
+        check(psvr::status_matches(psvr::Action::cinema_mode, *state) &&
+              !psvr::status_matches(psvr::Action::vr_mode, *state), "mode verification wrong");
+        f0[4] = 0;
+        const auto off = psvr::decode_status(f0.data(), 64);
+        check(off && psvr::status_matches(psvr::Action::power_off, *off) &&
+              !psvr::status_matches(psvr::Action::vr_mode, *off), "powered-off is falsely VR verified");
+        check(!psvr::decode_status(nullptr, 64) && !psvr::decode_status(f0.data(), 19), "short status accepted");
+        f0[4] = 1; f0[11] = 1;
+        check(psvr::status_matches(psvr::Action::vr_mode, *psvr::decode_status(f0.data(), 20)), "active VR not verified");
+        f0[11] = 3;
+        check(!psvr::status_matches(psvr::Action::vr_mode, *psvr::decode_status(f0.data(), 20)), "unknown VR state verified");
+        f0[2] = 0;
+        check(!psvr::decode_status(f0.data(), 64), "bad magic accepted");
+        f0[2] = 0xaa; f0[3] = 60;
+        check(!psvr::decode_status(f0.data(), 64), "wrong F0 length accepted");
+        const std::array<unsigned char, 20> hardware_status{{0xf0,0,0xaa,0x10,0x55,0x22,0,0,0,0xff,0,0,2,0,0,0,0,0,0,0}};
+        const auto actual = psvr::decode_status(hardware_status.data(), hardware_status.size());
+        check(actual && actual->powered() && actual->cinematic() && actual->vr_active == 0, "real F0 capture not parsed correctly");
+        check(!psvr::action_verified(psvr::Action::cinema_mode, actual, false), "matching F0 alone verified command without ACK");
+        check(!psvr::action_verified(psvr::Action::cinema_mode, std::nullopt, true), "ACK alone falsely verified state");
+        check(psvr::action_verified(psvr::Action::cinema_mode, actual, true), "ACK + state rejected");
+        const std::array<unsigned char, 8> ack{{0xa0,0,0xaa,4,0x17,0,0,0}};
+        const auto response = psvr::decode_response(ack.data(), ack.size());
+        check(response && response->command_id == 0x17 && response->result_code == 0, "A0 response wrong");
+        check(!psvr::decode_response(ack.data(), 5), "short A0 accepted");
+        check(!psvr::parse_action("--flash-firmware"), "unknown command recognized");
         std::cout << "PASS decoder: binary layout, signed values, malformed packets\n"
                   << "PASS selection: absent, incomplete, normal, ambiguous\n"
-                  << "PASS config: ranges, type, overflow, unknown fields\n";
+                  << "PASS config: ranges, type, overflow, unknown fields\n"
+                  << "PASS control: documented packets, F0 envelope, power/mode verification\n";
         return 0;
     } catch (const std::exception& e) {
         std::cerr << "FAIL " << e.what() << '\n';

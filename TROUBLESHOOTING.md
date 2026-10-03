@@ -11,12 +11,13 @@ Get-PnpDevice -PresentOnly | Where-Object { $_.InstanceId -match 'VID_054C&PID_0
 
 Usare `psvr_diag --enumerate-only` per inventario senza aprire 4/5.
 
-## USB presente ma HID 4/5 assenti — exit 3
+## USB presente ma interfacce richieste assenti — exit 3
 
-Leggere i service/problem code PnP e i path nel log. Se le interfacce sono
-legate a WinUSB/libusbK da un vecchio programma, HIDAPI non le enumera.
-Ripristinare per quelle sole interfacce il driver HID compatibile tramite
-Gestione dispositivi, documentando driver precedente. Non cambiare il driver
+Leggere service/problem code PnP e path nel log. **MI_04 deve essere HID**;
+**MI_05 può essere HID per capture passiva oppure WinUSB per M2**.
+HIDAPI non enumera le interfacce WinUSB/libusbK. Per MI_04 legata al driver
+sbagliato ripristinare HID tramite Gestione dispositivi, documentando il driver
+precedente. Per controllo M2 verificare WinUSB su MI_05. Non cambiare il driver
 del dispositivo USB composito o quello audio. Nessuna installazione automatica.
 
 ## Open/lettura fallisce
@@ -32,8 +33,9 @@ sono considerati ambigui: collegare un solo processor unit nella prima fase.
 controllare collegamenti del visore, ripetere 5 secondi, confrontare log.
 Il controllo può restare silenzioso senza comandi; sul visore di questa sessione
 il descriptor ha input=0, output=0, feature=5 e il tool evita la lettura input.
-Questi dati NON autorizzano a provare feature report inventati. M2 dovrà
-verificare come inviare i comandi documentati con il backend/driver Windows reale.
+Questi dati NON autorizzano a provare feature report inventati. M2 ha verificato
+**WinUSB sulla sola MI_05** per i comandi documentati; MI_04 rimane HID.
+Vedere `docs/WINUSB_CONTROL.md`.
 Non aggiungere comandi USB casuali per far apparire dati.
 
 ## Audio/H.264/BulkIn in errore
@@ -51,6 +53,22 @@ Log non scrivibile → exit 1; usare `--log-dir` con directory scrivibile.
 I log contengono path USB e possibili seriali: per un bug pubblico allegare
 una copia con gli identificativi personali eventualmente oscurati.
 
-SteamVR non è coinvolto in M1. La futura diagnosi di mancato HMD partirà
+## Comando M2 termina 5 o 6
+
+**5:** controllo ancora HidUsb/altro driver; il comando non è stato inviato.
+Verificare MI_05/service con inventario o `--enumerate-only`.
+**6:** distinguere `command transfer OK`, risposta A0 e nuovo F0. ACK=0
+non prova il cambio di stato. F0 è event-driven, non periodico. In VR/cinema
+i due flag possono essere incoerenti per ~1 s durante la transizione; il tool
+attende che concordino e che il visore sia acceso. Power-on ha richiesto ~2 s;
+se la transizione è ancora in corso aumentare `--control-timeout-ms 5000`.
+Se l'azione era già soddisfatta può non arrivare un nuovo F0. `--status` senza
+eventi termina con stato sconosciuto, non con errore del driver.
+
+WinUSB open fallito: codice Windows e service/INF/GUID della sola MI_05.
+Il tool cerca il GUID per l'esatto instance ID, verifica interfaccia 5 e legge
+i pipe dal descriptor, senza path/endpoint macchina-specifici hardcoded.
+
+SteamVR non è coinvolto in M1/M2. La futura diagnosi di mancato HMD partirà
 da factory/init/registration in `vrserver.txt`, poi presentazione in
 `vrcompositor.txt`; non da tentativi di modifica indiscriminata dei settings.

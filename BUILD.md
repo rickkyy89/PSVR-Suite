@@ -45,9 +45,13 @@ GCC 16.2.0, CMake 4.4.3 e Ninja inclusi. Target x64 imposto/verificato da CMake.
 
 HIDAPI 0.15.0 e nlohmann/json 3.12.0 scaricati via Git al primo configure,
 con commit completi fissati in CMake, compilati staticamente.
-Nessuna DLL libusb/OpenHMD/OpenVR necessaria per M1. MinGW usa runtime statico;
+Nessuna DLL libusb/OpenHMD/OpenVR necessaria per M1/M2. M2 collega WinUSB,
+SetupAPI e altre API di sistema Windows; nessuna nuova dipendenza scaricata.
+MinGW usa runtime statico;
 MSVC usa CRT statico. Restano le DLL di sistema Windows.
 Il pacchetto conserva config e licenze; nessuna struttura SteamVR attiva prima di M4.
+Comandi M2: WinUSB su sola MI_05, procedura manuale in `docs/WINUSB_CONTROL.md`.
+Compilazione ed esecuzione del tool non cambiano driver.
 
 Build directory distinte: `build/vs2022` e `build/mingw`.
 Configurazione default `RelWithDebInfo`, simboli utili al debug.
