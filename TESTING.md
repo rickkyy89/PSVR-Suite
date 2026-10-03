@@ -53,8 +53,10 @@ MILESTONE 1 PASS ...
 shutdown exit_code=0
 ```
 
-I metadati PnP/HID completi precedono il riepilogo. Il controllo viene aperto
-e letto passivamente con timeout: zero report non è errore. Il tool non afferma
+I metadati PnP/HID completi precedono il riepilogo. Il controllo viene aperto;
+se il descriptor espone input, viene letto passivamente con timeout. Sul PSVR
+testato **non espone input**, quindi la lettura viene saltata e loggata.
+Zero report controllo non è errore. Il tool non afferma
 che power/mode siano funzionanti. Ogni log ha nome unico timestamp/PID.
 
 Exit code: **0** report sensore 64 byte + HID 4/5 aperte; **2** PSVR assente;
@@ -65,9 +67,9 @@ CLI, inizializzazione, enumerazione o log falliti. `--enumerate-only` termina
 
 ## Checklist hardware
 
-- [ ] Eseguire collegato e conservare log, exit code e output console.
-- [ ] Scollegare **solo USB**, eseguire: deve terminare 2 senza crash.
-- [ ] Ricollegare USB, ripetere: apertura/lettura devono riprendersi.
+- [x] Eseguire collegato e conservare log, exit code e output console (sessione 2026-10-03).
+- [x] Scollegare **solo USB**, eseguire: deve terminare 2 senza crash (verificato).
+- [x] Ricollegare USB, ripetere: apertura/lettura devono riprendersi (verificato).
 - [ ] Scollegare USB durante capture di 5 s: errore reale o fine capture con
   dato disponibile, nessun crash/blocco; non avanzare se shutdown è problematico.
 

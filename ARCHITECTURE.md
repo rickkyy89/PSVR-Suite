@@ -230,7 +230,7 @@ OpenHMD BSL-1.0, OpenPSVR AGPL-3.0, libpsvr LGPL-3.0-or-later;
 mSparks non ha LICENSE globale, `Simulation.cpp` dichiara LGPLv3 e altri file
 hanno intestazioni Valve/Boost. Non attribuire una sola licenza all'intero fork.
 M1 usa protocollo/decoder adattato da OpenHMD con avvisi Boost preservati,
-HIDAPI sotto BSL-1.0 (una delle licenze offerte), JSON MIT. Non copia codice
+HIDAPI sotto BSD-3-Clause (una delle licenze offerte), JSON MIT. Non copia codice
 OpenPSVR/mSparks; per eventuale importazione futura valutare file per file.
 I sorgenti originali nuovi sono MIT; vedere `third_party/README.md`.
 
@@ -246,7 +246,11 @@ PnP presente ≠ HID accessibile ≠ report valido ≠ tracking corretto ≠ dis
 Nel PC iniziale sono presenti MI_04/MI_05 HID; audio 3D/H.264/BulkIn hanno
 stato errore. Non sono prerequisiti IMU: riportarli senza installare driver casuali.
 M1 richiede almeno un report sensore 64 byte e apertura controllo; una lettura
-controllo in timeout senza comando è lecita e NON prova protocollo power funzionante.
+controllo in timeout senza comando è lecita solo se esistono input report.
+La prova reale ha mostrato controllo input=0/output=0/feature=5: leggere le
+capacità Windows e saltare l'input, senza confonderlo con un errore USB.
+Prima di M2 verificare se il backend HID può inviare il comando documentato o
+se occorre backend libusb/WinUSB selettivo. L'apertura non prova il protocollo power.
 Assenza device deve terminare ordinatamente; scollegamento va provato fisicamente.
 
 Futuro logging: transport error, packet invalid, sequence gap, timestamp rollover,

@@ -30,7 +30,10 @@ sono considerati ambigui: collegare un solo processor unit nella prima fase.
 
 È diverso da un errore di open. Accendere tramite pulsante fisico,
 controllare collegamenti del visore, ripetere 5 secondi, confrontare log.
-Il controllo può restare silenzioso senza comandi: è atteso in M1.
+Il controllo può restare silenzioso senza comandi; sul visore di questa sessione
+il descriptor ha input=0, output=0, feature=5 e il tool evita la lettura input.
+Questi dati NON autorizzano a provare feature report inventati. M2 dovrà
+verificare come inviare i comandi documentati con il backend/driver Windows reale.
 Non aggiungere comandi USB casuali per far apparire dati.
 
 ## Audio/H.264/BulkIn in errore

@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "diagnostic": {
+    "duration_ms": 2000,
+    "read_timeout_ms": 100,
+    "raw_packets": 3,
+    "log_dir": "logs",
+    "logging_verbosity": "info"
+  }
+}

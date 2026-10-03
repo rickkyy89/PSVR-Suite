@@ -5,7 +5,7 @@ I progetti di studio non sono vendorizzati. Revisioni e file esaminati:
 revisioni immutabili e conservate in `build/<toolchain>/_deps/`.
 
 - HIDAPI 0.15.0: `d6b2a974608dec3b76fb1e36c189f22b9cf3650c`,
-  https://github.com/libusb/hidapi — scelta BSL-1.0 della tripla licenza.
+  https://github.com/libusb/hidapi — scelta BSD-3-Clause della tripla licenza.
 - nlohmann/json 3.12.0: `55f93686c01528224f448c19128836e7df245f72`,
   https://github.com/nlohmann/json — MIT.
 - Decoder sensore adattato da OpenHMD `src/drv_psvr/packet.c` e `psvr.h`,
