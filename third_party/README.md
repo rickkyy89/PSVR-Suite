@@ -22,3 +22,10 @@ OpenHMD/libpsvr e F0/A0 da libpsvr/PSVRFramework. Riferimento supplementare:
 `PSVRFramework/PSVR.cs` e wiki F0/USB Command Response Format: consultati,
 non copiati come sorgenti. Zadig 2.9 è un tool esterno GPLv3 usato dall'utente
 per cambiare MI_05; non distribuito nel pacchetto né invocato dalla build.
+
+M3: matematica/fusion nuove (`orientation_math.hpp`, `imu_fusion.hpp`) **MIT
+di progetto**, indipendenti (no OpenHMD-lib/Madgwick); solo fatti asse/unità
+OpenHMD riusati + decoder BSL preservato. Wear raw/IR: codice consultato da
+PSVRFramework, non copiato. GUI `tools/psvr_monitor/monitor.py` solo
+**stdlib Python 3.11 / Tk 8.6**. Il codice della GUI è MIT; CPython e Tcl/Tk
+installati separatamente conservano le proprie licenze e non sono vendorizzati.

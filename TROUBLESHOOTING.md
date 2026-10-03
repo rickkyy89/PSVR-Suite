@@ -72,3 +72,18 @@ i pipe dal descriptor, senza path/endpoint macchina-specifici hardcoded.
 SteamVR non è coinvolto in M1/M2. La futura diagnosi di mancato HMD partirà
 da factory/init/registration in `vrserver.txt`, poi presentazione in
 `vrcompositor.txt`; non da tentativi di modifica indiscriminata dei settings.
+
+## M3 — drift, recenter, prossimità, assi
+
+- **Drift da cattivo bias ≠ recenter.** Recenter imposta solo il riferimento
+  posa (full/yaw), non ricalibra il bias gyro. Se tutto deriva su tavolo dopo
+  cal in movimento, rifare cal 8 s tavolo hands-off, non premere solo Ricentra.
+  Caso visto: cal 2 s in movimento ⇒ residuo Y +0.648 dps ≈38.88 dpm.
+- **Statico falso / prossimità non provata.** `worn` = bit0 byte 8, IR = LE16
+  byte 55, bit1 display solo RAW. Worn true IR 1023 vs unworn false IR 183 visti,
+  ma prossimità come CAUSA di motion mancante non dimostrata: confrontare
+  indossato/non con flag raw + F0, senza inferire causa dai soli flag.
+- **Etichette assi.** RHand +X destra +Y up −Z forward: yaw-destra negativo,
+  pitch-su positivo, roll-destra negativo; grafici yaw(Y) rosso, pitch(X) verde,
+  roll(Z) blu. Non dichiarare inversioni risolte senza test fisico misurato
+  (≥10° primaria). Exit 7 = cal/qualità/capture incompleta.

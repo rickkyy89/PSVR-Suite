@@ -139,3 +139,17 @@ criterio ACK+stato, conflitti CLI e dry-run senza USB.
 - [ ] Ripristino fisico MI_05 a HID (procedura documentata).
 
 **Fermarsi dopo M2.** Prossima sessione: M3 IMU/orientamento e recenter.
+
+## Milestone 3 — IMU/fusion + monitor (IN_PROGRESS, rinvio docs)
+
+M3 non è completa. Procedure, assi, gate e comandi non duplicati qui;
+riferimenti canonici (altro agent):
+
+- [docs/IMU_TESTING.md](IMU_TESTING.md) — capture `--imu`, `--axis-test`,
+  `--stationary-test`, `--json-stream`, IPC `--recenter/--recalibrate/--stop-imu PID.
+- [docs/MONITOR_APP.md](MONITOR_APP.md) — GUI, API readonly, grafici/state.
+- [docs/MILESTONE_3_REPORT.md](MILESTONE_3_REPORT.md) — file/comandi/risultati/
+  fallimenti/fix/gate di questo agent.
+
+Sintesi: cal 8 s tavolo hands-off dopo 200 ms; build MinGW 14/14 CTest;
+statico 60 s originale PASS pre-gate; statico post-fix 42000 ms PENDING.

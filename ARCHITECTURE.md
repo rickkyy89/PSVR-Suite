@@ -314,3 +314,20 @@ reset o retry automatico. VR/cinema devono concordare entrambi i flag:
 aggiornamento in due fasi a ~1 s di distanza; power-on ~2 s. Timeout/stato
 sconosciuto distinti da I/O fallito; nessun successo dedotto dal solo ACK.
 Dettagli nel [report M2](docs/MILESTONE_2_REPORT.md). M3 non iniziata.
+
+## 11. Evoluzione M3 IN_PROGRESS (2026-10-03, non completa)
+
+Fusion originale C++17 `orientation_math.hpp`/`imu_fusion.hpp`/`imu_capture.*`:
+quaternione complementare gravità, MIT indipendente; solo fatti asse/unità
+OpenHMD riusati + decoder BSL; no OpenHMD-lib/Madgwick. Scale gyro 0.00105,
+accel 9.81/16384; cal 8 s + 200 ms warm, STD 0.75 dps / meanShift 0.05 dps,
+bias frozen, gravityGain 1, smoothing 0, recenter full/yaw.
+Full two-sided `worldYawReference.inverse*absolute*neutralHeadOffset`
+(offset destro, head-neutral identità senza tilt world-up); regressione
+tilt-30° + world-yaw puro senza coupling. `--json-stream` DATA (gyro/accel,
+tick24 1 µs rollover 16.777 s, WXYZ, YXZ, validity, wear bit0/IR LE16),
+F0 da IN WinUSB, CSV omonimo, gap-max 5 ms / stale 100 ms.
+Monitor `tools/psvr_monitor/monitor.py` Py3.11 Tk8.6, un NativeWorker, API
+readonly loopback effimera via `logs/monitor_api.json`. Assi RHand +X/+Y/−Z,
+segni yaw−/pitch+/roll−; grafici Y rosso, X verde, Z blu.
+M4 non iniziata; stereo/display/SteamVR non dichiarati.

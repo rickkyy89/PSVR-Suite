@@ -1,5 +1,33 @@
 # Stato del progetto
 
+## Sessione M3 — 2026-10-03 — IN_PROGRESS (non completa)
+
+- **M3 IN_PROGRESS, non COMPLETE; M4 non iniziata.** Fusion propria C++17
+  (`orientation_math.hpp` + `imu_fusion.hpp` + `imu_capture.*`): quaternione
+  complementare gravità, cal 8 s tavolo hands-off dopo 200 ms warm-up,
+  scale gyro 0.00105 / accel 9.81/16384, gate STD 0.75 dps + meanShift 0.05 dps,
+  bias congelato, gravityGain 1, smoothing 0, recenter full/yaw. Full corretto
+  two-sided; regressione tilt-30° passa.
+- GUI `tools/psvr_monitor/monitor.py` (Py 3.11 stdlib Tk 8.6) via
+  `scripts/run_monitor.ps1` / root `run_monitor.ps1`; API readonly loopback
+  effimera riscoperta via `logs/monitor_api.json`. Dettagli operativi in
+  `docs/IMU_TESTING.md`, `docs/MONITOR_APP.md`.
+- Build MinGW x64 OK **15/15 CTest**, inclusi **71 test Python** del monitor;
+  statico 60 s originale PASS
+  (drift -0.16°/min, pre-nuovi gate); due capture asse precoci fallite
+  conservate; drift-reclamo spiegato da cal in movimento (+0.648 dps Y).
+  Statico post-fix nella GUI **PASS**: 42000 report, 33.799532 s di tracking,
+  yaw +0.236718° = **+0.420216°/min**, pitch/roll in escursioni ~0.060°/~0.034°,
+  2 rollover, nessuna perdita/discontinuità, exit 0.
+- Verificata anche l'integrazione reale del backend GUI con **Stop immediato
+  all'avvio**, recenter, ricalibrazione e Stop/EOF: nessuna posa obsoleta valida.
+  Rafforzati watchdog di startup/progressione, rifiuto di duplicati,
+  invalidazione JSON sulle eccezioni e disponibilità IPC durante l'avvio.
+- Restano da verificare i **segni fisici di pitch/roll e il confronto controllato
+  indossato/non indossato**. Non sono state applicate inversioni arbitrarie.
+- Report: [docs/MILESTONE_3_REPORT.md](docs/MILESTONE_3_REPORT.md).
+  Non dichiarate stereo/display/SteamVR; Win11 reale, VS 2022/Win10 non verificati.
+
 ## Sessione M2 — 2026-10-03
 
 - **M2 completata, verificata sul PSVR reale.** Comandi espliciti `--power-on`,

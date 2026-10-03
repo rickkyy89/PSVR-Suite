@@ -4,6 +4,21 @@ Progetto open source per PSVR1 (visore PS4) su Windows 10/11 x64.
 Prima fase: diagnostica USB/HID indipendente; evoluzione prevista verso
 HMD-only SteamVR per video VR e Assetto Corsa, poi OpenXR/MSFS.
 
+**M3 IN_PROGRESS (non completa):** tracking 3DoF + monitor GUI in prova.
+Statico post-fix PASS (**0,42°/min**); restano i segni fisici degli assi e il
+confronto controllato indossato/non indossato.
+Vedere [STATUS.md](STATUS.md) e [report M3](docs/MILESTONE_3_REPORT.md).
+
+Interfaccia rapida (stato attuale):
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run_monitor.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\run_monitor.ps1 -StartImu -ImuDurationMs 42000 -StationaryTest
+```
+
+Calibrare 8 s su tavolo hands-off, poi indossare + Ricentra. Dettagli GUI/IMU:
+[docs/MONITOR_APP.md](docs/MONITOR_APP.md), [docs/IMU_TESTING.md](docs/IMU_TESTING.md).
+
 **Milestone 1 e 2 verificate sul PSVR reale:** rilevamento, ~1000 report sensore/s,
 power on/off e VR/cinema mode con conferma di stato dal dispositivo.
 Binding attuale: **sensori 4 = HID, controllo 5 = WinUSB**.

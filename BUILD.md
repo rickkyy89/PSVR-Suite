@@ -61,3 +61,17 @@ Non aggiungere binari/cache di terzi a Git.
 
 Se configure/build/test fallisce, lo script si ferma con codice errore e
 non installa un pacchetto apparentemente riuscito. Leggere l'errore prima di riprovare.
+
+## GUI monitor (opzionale, M3)
+
+Il driver/diagnostico resta standalone C++ con dipendenze fissate sopra.
+La GUI `tools/psvr_monitor/monitor.py` richiede solo **Python 3.11 + Tk 8.6
+stdlib** (launcher `py.exe`), nessuna USB in Python:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_monitor.ps1
+.\run_monitor.ps1 -StartImu -ImuDurationMs 42000 -StationaryTest
+```
+
+`scripts/run_monitor.ps1` verifica `out/diag/psvr_diag.exe`, `config.json`
+e Tk prima di avviare; senza Python la build/test C++ resta valida.
