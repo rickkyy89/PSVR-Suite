@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "diagnostic": {
     "duration_ms": 2000,
     "read_timeout_ms": 100,
@@ -7,5 +7,24 @@
     "raw_packets": 3,
     "log_dir": "logs",
     "logging_verbosity": "info"
+  },
+  "tracking": {
+    "capture_ms": 15000,
+    "calibration_ms": 8000,
+    "startup_discard_ms": 200,
+    "output_interval_ms": 100,
+    "stale_timeout_ms": 100,
+    "max_sample_gap_us": 5000,
+    "gyro_scale": 0.00105,
+    "accel_scale": 0.0005987548828125,
+    "gravity_gain": 1.0,
+    "accel_tolerance": 1.5,
+    "calibration_gyro_std_dps": 0.75,
+    "calibration_mean_shift_dps": 0.05,
+    "calibration_gyro_mean_dps": 10.0,
+    "calibration_accel_std": 0.25,
+    "smoothing_ms": 0,
+    "max_drift_dpm": 1.0,
+    "recenter_mode": "full"
   }
 }

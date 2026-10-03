@@ -3,6 +3,7 @@
 #include "sensor_packet.hpp"
 #include "pnp_windows.hpp"
 #include "control_windows.hpp"
+#include "imu_capture.hpp"
 #include <windows.h>
 #include <hidsdi.h>
 #include <hidapi.h>
@@ -40,18 +41,22 @@ std::string timestamp(bool filename = false) {
 
 class Logger {
     std::ofstream file_;
+    std::filesystem::path path_;
 public:
+    const std::filesystem::path& path() const { return path_; }
     explicit Logger(const std::string& directory) {
         const auto dir = std::filesystem::u8path(directory);
         std::filesystem::create_directories(dir);
-        const auto path = dir / ("psvr_diag_" + timestamp(true) + "_" + std::to_string(GetCurrentProcessId()) + ".log");
-        file_.open(path, std::ios::out | std::ios::trunc);
-        if (!file_) throw std::runtime_error("cannot create log: " + path.u8string());
-        write("INFO", "log_file=" + std::filesystem::absolute(path).u8string());
+        path_ = dir / ("psvr_diag_" + timestamp(true) + "_" + std::to_string(GetCurrentProcessId()) + ".log");
+        file_.open(path_, std::ios::out | std::ios::trunc);
+        if (!file_) throw std::runtime_error("cannot create log: " + path_.u8string());
+        write("INFO", "log_file=" + std::filesystem::absolute(path_).u8string());
     }
     void write(const char* level, const std::string& message) {
         const auto line = timestamp() + " [" + level + "] " + message;
         std::cout << line << '\n';
+        std::cout.flush(); // Structured telemetry must reach a GUI pipe live, not in buffered batches.
+        if (!std::cout) throw std::runtime_error("console/telemetry stream write failed");
         file_ << line << '\n';
         file_.flush();
         if (!file_) throw std::runtime_error("log write failed");
@@ -76,23 +81,31 @@ void help() {
         "                 [--control-info | --status | --power-on | --power-off |\n"
         "                  --vr-mode | --cinema-mode] [--control-timeout-ms 100..15000]\n"
         "                 [--dry-run (power/mode only: print bytes, never open USB)]\n"
+        "                 [--imu | --stationary-test | --axis-test yaw-right/pitch-up/roll-right]\n"
+        "                 [--output-interval-ms 20..5000] [--recenter-at-ms N]\n"
+        "                 [--recenter PID (request to an active IMU capture)]\n"
+        "                 [--recalibrate PID | --stop-imu PID] [--json-stream]\n"
+        "IMU: timestamp-based fusion, mandatory stationary calibration, R=recenter, C=recalibrate.\n"
+        "IMU default duration 15s, --duration-ms 0 runs until stopped; max timed 180000.\n"
         "M2 requires WinUSB on PSVR interface 5; sensors stay HID on interface 4.\n"
         "Only power (0x17) and VR/cinema (0x23) writes are supported; no firmware commands.\n"
         "Config is explicit; CLI options override it regardless of argument order.\n"
         "Exit: 0=PASS, 1=usage/config/internal, 2=absent, 3=interface/I/O,\n"
         "      4=no valid sensor report, 5=WinUSB control driver needed,\n"
-        "      6=state unverified, 130=interrupted. --control-info is read-only.\n";
+        "      6=state unverified, 7=IMU incomplete/quality gate, 130=interrupted.\n";
 }
 
 psvr::Options parse_options(int argc, char** argv) {
     psvr::Options options;
     std::string config;
+    bool explicit_duration = false;
     // First validate the whole command line and find explicit config; no hardware access.
     for (int i = 1; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--enumerate-only" || arg == "--all-devices" || arg == "--dry-run" || psvr::parse_action(arg)) continue;
+        if (arg == "--enumerate-only" || arg == "--all-devices" || arg == "--dry-run" || arg == "--imu" || arg == "--stationary-test" || arg == "--json-stream" || psvr::parse_action(arg)) continue;
         if (arg != "--config" && arg != "--duration-ms" && arg != "--read-timeout-ms" &&
-            arg != "--raw-packets" && arg != "--log-dir" && arg != "--control-timeout-ms")
+            arg != "--raw-packets" && arg != "--log-dir" && arg != "--control-timeout-ms" &&
+            arg != "--axis-test" && arg != "--recenter-at-ms" && arg != "--output-interval-ms" && arg != "--recenter" && arg != "--recalibrate" && arg != "--stop-imu")
             throw std::runtime_error("unknown option: " + arg);
         if (++i >= argc) throw std::runtime_error("missing value for " + arg);
         if (arg == "--config") {
@@ -112,18 +125,31 @@ psvr::Options parse_options(int argc, char** argv) {
         if (arg == "--enumerate-only") { options.enumerate_only = true; continue; }
         if (arg == "--all-devices") { options.all_devices = true; continue; }
         if (arg == "--dry-run") { options.dry_run = true; continue; }
+        if (arg == "--imu") { options.imu = true; continue; }
+        if (arg == "--json-stream") { options.json_stream = true; continue; }
+        if (arg == "--stationary-test") { options.imu = options.stationary_test = true; continue; }
         if (const auto action = psvr::parse_action(arg)) {
             if (options.action != psvr::Action::none) throw std::runtime_error("only one control action may be specified");
             options.action = *action;
             continue;
         }
         const std::string value = argv[++i];
-        if (arg == "--duration-ms") options.duration_ms = psvr::bounded_integer(value, 100, 60000);
+        if (arg == "--duration-ms") { options.duration_ms = psvr::bounded_integer(value, 0, 180000); explicit_duration = true; }
         if (arg == "--read-timeout-ms") options.read_timeout_ms = psvr::bounded_integer(value, 1, 1000);
         if (arg == "--control-timeout-ms") options.control_timeout_ms = psvr::bounded_integer(value, 100, 15000);
         if (arg == "--raw-packets") options.raw_packets = psvr::bounded_integer(value, 0, 100);
         if (arg == "--log-dir") options.log_dir = value;
+        if (arg == "--axis-test") {
+            if (value.empty()) throw std::runtime_error("axis-test value cannot be empty");
+            options.imu = true; options.axis_test = value;
+        }
+        if (arg == "--recenter-at-ms") options.recenter_at_ms = psvr::bounded_integer(value,1,179999);
+        if (arg == "--output-interval-ms") options.tracking.output_interval_ms = psvr::bounded_integer(value,20,5000);
+        if (arg == "--recenter") options.recenter_pid = psvr::bounded_integer(value,1,std::numeric_limits<int>::max());
+        if (arg == "--recalibrate") options.recalibrate_pid = psvr::bounded_integer(value,1,std::numeric_limits<int>::max());
+        if (arg == "--stop-imu") options.stop_imu_pid = psvr::bounded_integer(value,1,std::numeric_limits<int>::max());
     }
+    if (options.imu && !explicit_duration) options.duration_ms = options.tracking.capture_ms;
     psvr::validate_options(options);
     return options;
 }
@@ -146,6 +172,14 @@ std::string status_text(const psvr::ControlStatus& status) {
     return s.str();
 }
 
+void control_status_event(const psvr::ControlStatus& status, const psvr::Options& options, Logger& log) {
+    if (!options.json_stream) return;
+    const auto mode = !status.powered() ? "off" : status.cinematic() && status.vr_active == 0 ? "cinema" :
+                      !status.cinematic() && status.vr_active == 1 ? "vr" : "transition";
+    log.write("DATA",nlohmann::json{{"schema_version",1},{"event","control_status"},{"power_on",status.powered()},
+        {"worn",status.worn()},{"mode",mode},{"vr_active",status.vr_active},{"status_mask",status.mask}}.dump());
+}
+
 int control_action(psvr::WinUsbControl& control, const psvr::Options& options, Logger& log) {
     if (options.action == psvr::Action::control_info) {
         log.write("INFO", "control-info complete: descriptors only, no command sent");
@@ -160,8 +194,10 @@ int control_action(psvr::WinUsbControl& control, const psvr::Options& options, L
         for (; drained < 32 && !interrupted.load(); ++drained) {
             const auto bytes = control.read(10);
             if (bytes.empty()) break;
-            if (const auto status = psvr::decode_status(bytes.data(), bytes.size()))
+            if (const auto status = psvr::decode_status(bytes.data(), bytes.size())) {
                 log.write("INFO", "pre-command status " + status_text(*status));
+                control_status_event(*status,options,log);
+            }
         }
         if (interrupted.load()) return 130;
         if (drained == 32) {
@@ -206,6 +242,7 @@ int control_action(psvr::WinUsbControl& control, const psvr::Options& options, L
             if (!latest || latest->mask != status->mask || latest->vr_active != status->vr_active)
                 log.write("INFO", "control status " + status_text(*status));
             latest = status;
+            control_status_event(*status,options,log);
         }
         if (!writing || psvr::action_verified(options.action, latest, acknowledged)) {
             log.write("INFO", writing ? std::string("MILESTONE 2 action verified: ") + psvr::action_name(options.action) +
@@ -335,7 +372,7 @@ int capture(hid_device* sensor, hid_device* control, bool control_supports_input
 
 int diagnose(const psvr::Options& options, Logger& log) {
     HidSession session;
-    log.write("INFO", std::string("psvr_diag 0.2.0 x64 HIDAPI=") + hid_version_str() + " action=" + psvr::action_name(options.action));
+    log.write("INFO", std::string("psvr_diag 0.3.0 x64 HIDAPI=") + hid_version_str() + " action=" + (options.imu ? "imu" : psvr::action_name(options.action)));
     log.write("INFO", "USB detection started");
     const auto usb = psvr::enumerate_usb();
     unsigned int matches = 0, composite_devices = 0;
@@ -352,6 +389,9 @@ int diagnose(const psvr::Options& options, Logger& log) {
                 "USB PnP id=" + device.instance_id + " name=" + device.name + " service=" + device.service +
                 " problem_code=" + std::to_string(device.problem) + " status=" + std::to_string(device.status) +
                 " status_query_result=" + std::to_string(device.status_result));
+            if (options.json_stream && device.is_psvr) log.write("DATA",nlohmann::json{{"schema_version",1},{"event","usb_device"},
+                {"instance_id",device.instance_id},{"name",device.name},{"service",device.service},
+                {"problem_code",device.problem},{"is_psvr",device.is_psvr}}.dump());
         }
     }
     log.write("INFO", "USB enumeration present_nodes=" + std::to_string(usb.size()) + " psvr_nodes=" + std::to_string(matches));
@@ -451,7 +491,11 @@ int diagnose(const psvr::Options& options, Logger& log) {
         return 3;
     }
     if (!control_supports_input) log.write("INFO", "passive sensor capture: control input not consumed (no commands)");
-    const auto result = capture(sensor.get(), control.get(), control_supports_input, options, log);
+    int result = 0;
+    if (options.imu) {
+        auto csv_path = log.path(); csv_path.replace_extension(".csv");
+        result = psvr::capture_imu(sensor.get(),usb_control.get(),options,[&](const char* level,const std::string& text) { log.write(level,text); },interrupted,csv_path);
+    } else result = capture(sensor.get(), control.get(), control_supports_input, options, log);
     sensor.reset();
     control.reset();
     usb_control.reset();
@@ -471,6 +515,15 @@ int main(int argc, char** argv) {
             " read_timeout_ms=" + std::to_string(options.read_timeout_ms) + " raw_packets=" +
             std::to_string(options.raw_packets) + " verbosity=" + options.verbosity +
             " control_timeout_ms=" + std::to_string(options.control_timeout_ms));
+        if (options.recenter_pid || options.recalibrate_pid || options.stop_imu_pid) {
+            const auto pid = options.recenter_pid ? options.recenter_pid : options.recalibrate_pid ? options.recalibrate_pid : options.stop_imu_pid;
+            if (options.recenter_pid) psvr::request_recenter(pid);
+            if (options.recalibrate_pid) psvr::request_recalibrate(pid);
+            if (options.stop_imu_pid) psvr::request_stop_imu(pid);
+            log->write("INFO","IMU request delivered to PID="+std::to_string(pid)+" (asynchronous; confirm in target capture log)");
+            log->write("INFO","shutdown exit_code=0 (no USB opened)");
+            return 0;
+        }
         if (options.dry_run) {
             const auto bytes = psvr::command_packet(options.action);
             log->write("INFO", std::string("dry-run action=") + psvr::action_name(options.action) + " packet=" +

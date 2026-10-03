@@ -19,6 +19,9 @@ struct SensorSample {
 struct SensorPacket {
     std::array<SensorSample, 2> samples;
     std::uint8_t sequence;
+    std::uint8_t status_raw;
+    std::uint16_t ir_raw;
+    bool worn() const { return (status_raw & 1) != 0; }
 };
 
 inline std::uint32_t le32(const unsigned char* b) {
@@ -42,6 +45,10 @@ inline std::optional<SensorPacket> decode_sensor(const unsigned char* b, std::si
         }
     }
     result.sequence = b[63];
+    // PSVRFramework PSVR.cs ccda7ca: worn = byte8 bit0, raw IR = LE16 at 55.
+    // Byte8 bit1 display semantics conflict between references; expose raw only.
+    result.status_raw = b[8];
+    result.ir_raw = static_cast<std::uint16_t>(unsigned(b[55]) | (unsigned(b[56]) << 8));
     return result;
 }
 } // namespace psvr

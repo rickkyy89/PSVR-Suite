@@ -27,6 +27,7 @@ int main() {
         bytes[26] = 0x34; bytes[27] = 0x12;
         bytes[42] = 0x00; bytes[43] = 0xc0;
         bytes[63] = 0xa5;
+        bytes[8] = 0x91; bytes[55] = 0xff; bytes[56] = 3;
         const auto packet = psvr::decode_sensor(bytes.data(), bytes.size());
         check(packet.has_value(), "valid packet rejected");
         check(packet->samples[0].tick == 0xfffffe && packet->samples[1].tick == 498, "timestamps/endian wrong");
@@ -34,6 +35,7 @@ int main() {
             packet->samples[0].gyro[2] == -1, "signed gyro wrong");
         check(packet->samples[0].accel[0] == 0x1234 && packet->samples[1].accel[0] == -16384, "sample/accel layout wrong");
         check(packet->sequence == 0xa5, "sequence wrong");
+        check(packet->worn() && packet->status_raw == 0x91 && packet->ir_raw == 1023,"sensor presence/raw IR offsets wrong");
         for (const auto size : {0u, 1u, 63u, 65u, 512u})
             check(!psvr::decode_sensor(bytes.data(), size), "malformed packet accepted");
         check(!psvr::decode_sensor(nullptr, 64), "null packet accepted");
@@ -96,6 +98,14 @@ int main() {
         check(response && response->command_id == 0x17 && response->result_code == 0, "A0 response wrong");
         check(!psvr::decode_response(ack.data(), 5), "short A0 accepted");
         check(!psvr::parse_action("--flash-firmware"), "unknown command recognized");
+        auto cfg2 = nlohmann::json::parse(R"({"schema_version":2,"diagnostic":{},"tracking":{"calibration_ms":3000,"recenter_mode":"yaw"}})");
+        check(psvr::config_options(cfg2).tracking.calibration_ms == 3000,"tracking config not applied");
+        cfg2["tracking"]["smoothing_ms"] = -1;
+        rejects([&] { psvr::config_options(cfg2); },"negative smoothing accepted");
+        psvr::Options continuous; continuous.imu = true; continuous.duration_ms = 0;
+        psvr::validate_options(continuous);
+        continuous.stationary_test = true;
+        rejects([&] { psvr::validate_options(continuous); },"unbounded measurement profile accepted");
         std::cout << "PASS decoder: binary layout, signed values, malformed packets\n"
                   << "PASS selection: absent, incomplete, normal, ambiguous\n"
                   << "PASS config: ranges, type, overflow, unknown fields\n"
