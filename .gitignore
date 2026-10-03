@@ -1,0 +1,8 @@
+/build/
+/out/
+/logs/*
+!/logs/.gitkeep
+/third_party/cache/
+/.toolchain/
+/.vs/
+*.user
