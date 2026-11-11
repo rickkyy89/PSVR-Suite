@@ -333,7 +333,7 @@ def run_collect(dest_dir: Path = DEST, manifest_path: Path = MANIFEST) -> dict:
         })
     result = {"licenses": manifest}
     manifest_path.write_text(json.dumps(result, indent=2) + "\n",
-                             encoding="utf-8")
+                             encoding="utf-8", newline="\n")
     return result
 
 

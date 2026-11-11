@@ -67,6 +67,7 @@ set(PSVR_PSEYE_PATCH
 set(PSVR_PSEYE_PATCHES "${PSVR_PSEYE_PATCH}"
     "${CMAKE_CURRENT_SOURCE_DIR}/patches/0002-transfer-fault-lifetime.patch"
     "${CMAKE_CURRENT_SOURCE_DIR}/patches/0003-refresh-idle-inventory.patch")
+get_filename_component(PSVR_PSEYE_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 
 if(PSVR_PSEYE_BUILD_UPSTREAM)
     find_package(Git QUIET)
@@ -105,9 +106,13 @@ if(PSVR_PSEYE_BUILD_UPSTREAM)
         "${PSVR_PSEYE_UPSTREAM_DIR}/LICENSE" COPYONLY)
     foreach(patch IN LISTS PSVR_PSEYE_PATCHES)
         set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${patch}")
+        # The generated copy lives below the outer repository's ignored build/
+        # directory. Stop Git discovery at the PSVR root: otherwise git apply
+        # silently skips diff --git hunks as ignored and later patch guards fail.
         execute_process(
-            COMMAND "${GIT_EXECUTABLE}" apply --whitespace=nowarn
-                "${patch}"
+            COMMAND "${CMAKE_COMMAND}" -E env
+                "GIT_CEILING_DIRECTORIES=${PSVR_PSEYE_REPO_ROOT}"
+                "${GIT_EXECUTABLE}" apply --whitespace=nowarn "${patch}"
             WORKING_DIRECTORY "${PSVR_PSEYE_UPSTREAM_DIR}"
             RESULT_VARIABLE PSVR_PSEYE_PATCH_RESULT
             ERROR_VARIABLE PSVR_PSEYE_PATCH_ERROR)
@@ -191,7 +196,6 @@ endif()
 # --------------------------------------------------------------------------- #
 # <repo>/out/pseye whether built standalone (-S tools/psvr_pseye) or via
 # add_subdirectory(tools/psvr_pseye).
-get_filename_component(PSVR_PSEYE_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
 include(CTest)
 if(BUILD_TESTING AND PSVR_PSEYE_BUILD_UPSTREAM)
     find_package(Python3 3.11 COMPONENTS Interpreter REQUIRED)

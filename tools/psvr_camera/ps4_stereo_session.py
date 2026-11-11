@@ -843,9 +843,10 @@ class StereoSession:
                 if closed and cleanup_error is not None:
                     with self._condition:
                         self._error = self._error or f"camera cleanup failed: {cleanup_error}"
-                    # Owner completion does not establish successful release:
-                    # a throwing native close leaves handle ownership unknown.
-                    closed = False
+                    # Calibration must report completed owner cleanup even when
+                    # its error is terminal. A persistent Suite capture instead
+                    # remains unsafe to reopen because handle ownership is unknown.
+                    closed = self._restore_controls
             else:
                 try:
                     closed = bool(cap.release(timeout_s=0))

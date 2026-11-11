@@ -1,0 +1,4 @@
+# Preserve the exact bytes of hash-audited artifacts and upstream patches.
+*.json -text
+*.patch -text
+/third_party/** -text
