@@ -1220,6 +1220,36 @@ class CLITests(unittest.TestCase):
             self.assertEqual(error.exception.code, 2)
             backend.assert_not_called()
 
+    def test_invalid_root_rejected_before_backend_or_api(self):
+        with tempfile.TemporaryDirectory() as directory:
+            missing = str(Path(directory) / "missing-root")
+            marker = Path(directory) / "marker.txt"
+            marker.write_text("x", encoding="utf-8")
+            before = sorted(p.name for p in Path(directory).iterdir())
+            with patch.object(monitor, "Backend") as backend, patch.object(monitor, "MonitorAPI") as api, \
+                 patch.object(monitor, "MonitorWindow") as window:
+                for root in (missing, str(marker)):
+                    with self.subTest(root=root), redirect_stderr(io.StringIO()), \
+                         self.assertRaises(SystemExit) as error:
+                        monitor.main(["--root", root])
+                    self.assertEqual(error.exception.code, 2)
+                backend.assert_not_called()
+                api.assert_not_called()
+                window.assert_not_called()
+            self.assertFalse(Path(missing).exists())
+            self.assertTrue(marker.is_file())
+            self.assertEqual(sorted(p.name for p in Path(directory).iterdir()), before)
+
+    def test_valid_root_passes_resolved_path_to_backend_and_api(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            with patch.object(monitor, "Backend") as backend, patch.object(monitor, "MonitorAPI"), \
+                 patch.object(monitor, "MonitorWindow") as window, \
+                 redirect_stderr(io.StringIO()):
+                self.assertEqual(monitor.main(["--root", directory]), 0)
+                backend.assert_called_once_with(root)
+                window.return_value.run.assert_called_once()
+
     def test_invalid_cli_rejected_before_backend_or_api(self):
         cases = [["--stationary-test"], ["--imu-duration-ms", "42000"],
                  ["--start-imu", "--stationary-test"],

@@ -1,0 +1,8 @@
+{
+  "alwaysActivate": false,
+  "name": "psvrpc",
+  "directory": "",
+  "resourceOnly": false,
+  "hmd_presence": ["054C.09AF"],
+  "redirectsDisplay": true
+}

@@ -1,0 +1,171 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-msvc-offline:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - name: Checkout (read-only, no push)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python test deps (known-tested versions)
+        # Versions verified in the local camera venv (Python 3.11.9).
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+        shell: pwsh
+
+      - name: Configure (preset vs2022, pinned FetchContent commits)
+        # Preset from CMakePresets.json: VS 17 2022 x64, BUILD_TESTING=ON,
+        # driver staging out/driver_psvrpc_msvc/psvrpc.
+        # Deps are pinned in CMakeLists.txt: hidapi d6b2a97, json 55f9368,
+        # OpenVR headers-only 0924064.
+        # Fully offline alternative with pre-fetched checkouts:
+        # cmake --preset vs2022 -DFETCHCONTENT_SOURCE_DIR_HIDAPI=<path>
+        #   -DFETCHCONTENT_SOURCE_DIR_NLOHMANN_JSON=<path>
+        #   -DFETCHCONTENT_SOURCE_DIR_OPENVR_SDK=<path>
+        run: cmake --preset vs2022
+        shell: pwsh
+
+      - name: Build (RelWithDebInfo, console output)
+        run: cmake --build build/vs2022 --config RelWithDebInfo --parallel
+        shell: pwsh
+
+      - name: CTest offline (no live hardware, driver never registered)
+        run: |
+          New-Item -ItemType Directory -Path build/ci-logs -Force | Out-Null
+          ctest --test-dir build/vs2022 -C RelWithDebInfo --output-on-failure --timeout 300 *> build/ci-logs/ctest.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { Get-Content build/ci-logs/ctest.log -Tail 40; throw "CTest failed with exit $code" }
+        shell: pwsh
+
+      - name: Pytest full suite (offline, no hardware)
+        # Covers all test_suite*.py incl. i18n (see CTest suite_python).
+        # tracking tests need numpy; preview code imports cv2 lazily.
+        run: |
+          python -B -m pytest tests -q *> build/ci-logs/pytest-suite.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { Get-Content build/ci-logs/pytest-suite.log -Tail 40; throw "pytest suite failed with exit $code" }
+        shell: pwsh
+
+      - name: Offline PowerShell script test (temp fixtures only)
+        run: |
+          powershell -NoProfile -ExecutionPolicy Bypass -File tests/test_projection_trial.ps1 *> build/ci-logs/projection.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { Get-Content build/ci-logs/projection.log -Tail 40; throw "projection trial test failed with exit $code" }
+        shell: pwsh
+
+      - name: Headless suite check (no Tk, no hardware)
+        # stdlib only: app.py keeps numpy/cv2 imports lazy, out of headless.
+        run: |
+          $env:PYTHONPATH = "${{ github.workspace }}"
+          python -m tools.psvr_suite --headless-check --root "${{ github.workspace }}"
+        shell: pwsh
+
+      - name: Licence check (self-contained, no network)
+        run: python tools/collect_licenses.py --check
+        shell: pwsh
+
+  # B14-02: tools/psvr_pseye ha propri add_test ma la root non fa
+  # add_subdirectory, quindi il job principale non lo copre. Job separato
+  # con configure standalone del sotto-progetto.
+  pseye-offline:
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - name: Checkout (read-only, no push)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Configure pseye standalone (pinned upstream, no hardware/libusb)
+        # Fetch pinnato inspirit/PS3EYEDriver fe03494e648d0bf2aaa77869e5b50965e2e23620
+        # (stessa classe di rischio dei pin hidapi/json/openvr del job principale;
+        # nessun download non pinnato). I 3 test offline usano double simulate
+        # (libusb/coda/enumerazione): nessuna camera e nessun link libusb
+        # richiesti; libusb assente => solo WARNING di CMake, ps3eye.dll reale
+        # skippata, i test si compilano comunque.
+        run: cmake -S tools/psvr_pseye -B build/pseye -DBUILD_TESTING=ON
+        shell: pwsh
+
+      - name: Build pseye offline targets (Release)
+        run: cmake --build build/pseye --config Release --target psvr_pseye_transfer_tests psvr_pseye_inventory_tests psvr_pseye psvr_pseye_legacy_fixture
+        shell: pwsh
+
+      - name: CTest pseye offline (transfer/inventory/patch-guard)
+        run: |
+          New-Item -ItemType Directory -Path build/ci-logs-pseye -Force | Out-Null
+          ctest --test-dir build/pseye -C Release -R "^pseye_" --output-on-failure *> build/ci-logs-pseye/ctest-pseye.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { Get-Content build/ci-logs-pseye/ctest-pseye.log -Tail 40; throw "pseye CTest failed with exit $code" }
+        shell: pwsh
+
+  # B14-03: il job principale configura con --preset + build + test senza mai
+  # esercitare scripts/build.ps1 né cmake --install (regole install() e
+  # ordinamento test-prima-di-install mai testati). Job separato che lancia il
+  # path documentato end-to-end con i default (VS2022/RelWithDebInfo, tutto
+  # dentro il repo: diag in out/diag, driver in out/driver_psvrpc_msvc).
+  # Job esistenti intatti, nessun deploy/publish. La variante MinGW resta
+  # manuale (richiede -ToolchainRoot locale, vedi BUILD.md).
+  build-ps1-offline:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - name: Checkout (read-only, no push)
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python test deps (known-tested versions)
+        # Stesse versioni del job principale: build.ps1 esegue l'intero CTest,
+        # inclusi i test Python registrati in CMake.
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+        shell: pwsh
+
+      - name: Run scripts/build.ps1 (configure, build, CTest, cmake --install)
+        # Default VS2022/RelWithDebInfo: vswhere/VS2022, CMake/CTest e git sono
+        # preinstallati su windows-2022; FetchContent usa gli stessi pin del
+        # job principale (hidapi/json/openvr). Install solo dentro il repo.
+        run: |
+          New-Item -ItemType Directory -Path build/ci-logs-build-ps1 -Force | Out-Null
+          powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build.ps1 -Configuration RelWithDebInfo *> build/ci-logs-build-ps1/build-ps1.log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { Get-Content build/ci-logs-build-ps1/build-ps1.log -Tail 40; throw "build.ps1 failed with exit $code" }
+        shell: pwsh
+
+      - name: Verify in-repo install layout (no deploy)
+        # Controllo read-only che le regole install() abbiano prodotto il
+        # layout atteso dentro il repo; nessuna registrazione/publish.
+        run: |
+          foreach ($p in @('out/diag/psvr_diag.exe', 'out/diag/config.json', 'out/diag/licenses')) {
+            if (-not (Test-Path -LiteralPath $p)) { throw "missing install output: $p" }
+          }
+        shell: pwsh

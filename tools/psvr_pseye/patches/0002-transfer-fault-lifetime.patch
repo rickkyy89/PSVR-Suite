@@ -1,0 +1,96 @@
+--- a/src/ps3eye.cpp
++++ b/src/ps3eye.cpp
+@@ -811,5 +811,9 @@
+ 		int res = 0;
+ 		transfers_started = true;
++		{
++			std::lock_guard<std::mutex> lock(num_active_transfers_mutex);
++			transfers_stopping = false;
++		}
+ 		for (int index = 0; index < NUM_TRANSFERS; ++index)
+ 		{
+ 			// Create & submit the transfer
+@@ -856,6 +860,7 @@
+ 			queue->Abort();
+ 		}
+ 		std::lock_guard<std::mutex> lock(num_active_transfers_mutex);
++		transfers_stopping = true;
+ 		for (int index = 0; index < NUM_TRANSFERS; ++index)
+ 		{
+ 			if (xfr[index] != NULL) {
+@@ -874,6 +879,7 @@
+ 
+ 		{
+ 			std::unique_lock<std::mutex> lock(num_active_transfers_mutex);
++			transfers_stopping = true;
+ 			if (num_active_transfers != 0)
+ 			{
+ 				// Cancel any pending transfers
+@@ -1052,6 +1058,7 @@
+ 	std::shared_ptr<FrameQueue>	frame_queue;
+ 	std::mutex				frame_queue_mutex;
+ 	bool					transfers_started;
++	bool                    transfers_stopping = false;
+ };
+ 
+ static void LIBUSB_CALL transfer_completed_callback(struct libusb_transfer *xfr)
+@@ -1059,40 +1066,39 @@
+     URBDesc *urb = reinterpret_cast<URBDesc*>(xfr->user_data);
+     enum libusb_transfer_status status = xfr->status;
+ 
+-    if (status != LIBUSB_TRANSFER_COMPLETED) 
+-    {
+-        debug("transfer status %d\n", status);
+-
+-        // Clear the slot before freeing so a later close_transfers()/
+-        // cancel_all() does not touch a dangling transfer. The slot array is
+-        // guarded by num_active_transfers_mutex.
++    // Retire a completed (or never re-submitted) transfer exactly once.
++    // The active count owns URBDesc until the FINAL access in this callback.
++    const auto retire = [&](bool cancel_others) {
+         {
+             std::lock_guard<std::mutex> lock(urb->num_active_transfers_mutex);
+             for (int index = 0; index < NUM_TRANSFERS; ++index) {
+                 if (urb->xfr[index] == xfr) {
+                     urb->xfr[index] = NULL;
+                     break;
+                 }
+             }
+         }
++        if (cancel_others) urb->cancel_all();
+         libusb_free_transfer(xfr);
+-		urb->transfer_canceled();
+-        
+-        if(status != LIBUSB_TRANSFER_CANCELLED)
+-        {
+-            // On the libusb event thread: never block waiting for other
+-            // cancellations here or the event thread deadlocks.
+-            urb->cancel_all();
+-        }
++        urb->transfer_canceled(); // last use: close may now destroy urb
++    };
++    if (status != LIBUSB_TRANSFER_COMPLETED) {
++        retire(status != LIBUSB_TRANSFER_CANCELLED);
+         return;
+     }
+ 
+-    //debug("length:%u, actual_length:%u\n", xfr->length, xfr->actual_length);
+-
+     urb->pkt_scan(xfr->buffer, xfr->actual_length);
+ 
+-    if (libusb_submit_transfer(xfr) < 0) {
+-        debug("error re-submitting URB\n");
+-        urb->cancel_all();
++    int result;
++    bool stopping;
++    {
++        // Serialize re-submit with cancellation: close must not miss a
++        // transfer that is submitted just after its cancellation sweep.
++        std::lock_guard<std::mutex> lock(urb->num_active_transfers_mutex);
++        stopping = urb->transfers_stopping;
++        result = stopping ? 0 : libusb_submit_transfer(xfr);
++    }
++    if (stopping || result < 0) {
++        retire(!stopping);
+     }
+ }

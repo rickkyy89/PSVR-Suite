@@ -13,6 +13,7 @@ class ImuProgressWatchdog {
 public:
     void report_received() { saw_report_ = true; }
     void advanced(std::int64_t elapsed_ms) { last_advance_ms_ = elapsed_ms; }
+    std::int64_t last_advance_ms() const { return last_advance_ms_; }
     ProgressFailure failure(std::int64_t elapsed_ms, bool tracking, int tracking_timeout_ms) const {
         if (!saw_report_) return elapsed_ms > 3000 ? ProgressFailure::no_reports : ProgressFailure::none;
         const auto limit = tracking ? tracking_timeout_ms : 1000;

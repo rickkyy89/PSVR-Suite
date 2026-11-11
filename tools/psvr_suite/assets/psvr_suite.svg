@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <!-- Sorgente riproducibile icona PSVR Suite. Sfondo blu scuro, visore cyan, LED magenta. -->
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="#0b1e33"/>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="none" stroke="#38e1ff" stroke-width="6"/>
+  <!-- Visore: barra orizzontale arrotondata -->
+  <rect x="44" y="96" width="168" height="64" rx="30" fill="#123a5c" stroke="#38e1ff" stroke-width="8"/>
+  <!-- LED: 5 punti magenta -->
+  <circle cx="76" cy="128" r="9" fill="#ff3fd4"/>
+  <circle cx="104" cy="128" r="9" fill="#ff3fd4"/>
+  <circle cx="128" cy="128" r="9" fill="#ff3fd4"/>
+  <circle cx="152" cy="128" r="9" fill="#ff3fd4"/>
+  <circle cx="180" cy="128" r="9" fill="#ff3fd4"/>
+  <!-- Guida tracking: arco verde sottile -->
+  <path d="M64 176 Q128 200 192 176" fill="none" stroke="#3dff8a" stroke-width="7" stroke-linecap="round"/>
+</svg>

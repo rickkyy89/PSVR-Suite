@@ -44,6 +44,74 @@ Sono altre interfacce del composite device. M1 riporta service/problem code,
 ma non le apre. Il loro errore non implica fallimento sensori/controllo.
 Diagnosticarle separatamente solo se diventeranno necessarie.
 
+## Audio muto in SteamVR (modalità VR) — cuffia OK in cinema
+
+Sessione utente validata: in modalità cinema l'audio esce dalla cuffia del
+processor unit (stream HDMI dal PC). In modalità VR/SteamVR la cuffia è
+risultata muta. Il routing hardware/firmware del PU è una possibile causa,
+da distinguere dall'endpoint scelto da SteamVR e dal routing dell'applicazione.
+Il protocollo di controllo documentato (power
+0x17, mode 0x23, LED 0x15) **non ha alcun comando audio/uscita cuffia**:
+nessun ripristino dell'audio al jack del visore in VR è stato implementato
+o validato in questa modifica.
+
+Diagnosi in sola lettura, senza toccare SteamVR o i driver:
+
+```powershell
+.venv-camera\Scripts\python.exe -m tools.psvr_audio_diag          # live
+.venv-camera\Scripts\python.exe -m tools.psvr_audio_diag --offline # soli fatti/guida
+```
+
+Il tool usa esclusivamente l'osservazione passiva `psvr_diag --status`
+(F0; nessun comando power/mode/LED) e query PnP/CIM in lettura.
+F0 assente ⇒ `pu_mode: unknown`, mai dedotto. Nota importante: l'interfaccia
+USB **MI_01 "PS VR Audio"** (usbaudio) **non equivale** al 3D audio
+proprietario: selezionarla come periferica di riproduzione è al più un
+percorso stereo non ancora validato. L'inventario PnP del tool non determina
+l'endpoint di default né il routing per-app: verificarli nelle impostazioni
+audio SteamVR e con `mmsys.cpl` / mixer volume. Non cambiare il driver MI_01
+(vincolo M2: audio invariato). Dettagli e coda di validazione hardware:
+`docs/AUDIO_TRACKING_CAMERA_20261015.md`.
+
+**Soluzione pratica (workaround, non fix):** poiché il jack cuffia del PU
+può essere muto in VR e non esiste alcun comando host documentato per
+cambiare il routing interno del PU, provare una **cuffia
+separata collegata al PC** (USB o jack 3,5 mm) impostata come dispositivo
+audio di SteamVR: l'audio passa dal PC, non dal PU. È un aggiramento
+dell'operatore, non un ripristino dell'uscita cuffia del visore e non è
+validato come fix.
+
+## Videocamera 6DoF: scegliere la sorgente non sostituisce la calibrazione
+
+Nella scheda **Camera**, la tendina **Videocamera 6DoF** mostra PS3 Eye,
+OpenCV DirectShow, OpenCV MSMF, OpenCV (auto) e **PS4 Camera stereo**. Il valore
+`camera_source` sceglie **quale camera il worker apre** lato host; non scrive in
+`steamvr.vrsettings` e **non calibra**. Gli intrinseci si caricano da
+`intrinsicsPath` e il worker rifiuta frame con risoluzione diversa da
+quella calibrata (`"live camera resolution differs from calibration"`).
+
+I profili restano separati. PS3 Eye usa
+`configurations/pseye_blue_640x480_calibrated.json`; PS4 Camera stereo richiede
+la preparazione UVC esterna e usa `configurations/ps4_stereo_640x400_suite.json`
+insieme ai controlli di `configurations/ps4_suite_source.json` (exposure −7,
+gain 8, brightness 1, Manual). Il pannello PS4 separato serve per acquisizione e
+calibrazione; il tracking 6DoF si sceglie e si applica dalla scheda Camera della
+Suite. Vedi [guida PS4](docs/PS4_CAMERA.md) e
+[diagnosi front-five e limiti](docs/PS4_FRONT5_DIAGNOSTICS_20261101.md).
+
+## Tracking che degrada dopo diversi minuti
+
+La prossima release include una correzione della mappatura temporale IMU:
+finestra mobile di 2 s al posto del minimo dell'intera sessione, timestamp
+pubblicati immutabili e aumento dell'offset limitato per non rendere freschi
+campioni arretrati dopo una pausa di trasporto. I test sintetici coprono
+sessioni ininterrotte di 20 minuti; non dimostrano la causa del problema reale.
+
+Ripetere una sessione 6DoF di 20–30 minuti. Se ricompaiono gli scatti,
+conservare il JSONL del tracking prima di riavviare: età IMU, intervalli camera
+e motivi di perdita/rifiuto consentono di distinguere clock, cattura e
+associazione ottica. Il collaudo hardware lungo resta aperto.
+
 ## Build e log
 
 La prima configurazione richiede Git/rete verso GitHub; proxy/certificati

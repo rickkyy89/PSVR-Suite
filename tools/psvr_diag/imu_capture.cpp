@@ -70,11 +70,16 @@ void request_stop_imu(int pid) {
 }
 
 int capture_imu(hid_device* sensor, WinUsbControl* control, const Options& options, const ImuLog& log,
-                std::atomic<bool>& interrupted, const std::filesystem::path& csv_path) {
+                 std::atomic<bool>& interrupted, const std::filesystem::path& csv_path) {
+    return capture_imu(sensor,control,options,log,interrupted,csv_path,Clock::now);
+}
+
+int capture_imu(hid_device* sensor, WinUsbControl* control, const Options& options, const ImuLog& log,
+                std::atomic<bool>& interrupted, const std::filesystem::path& csv_path, ImuNow now) {
     if (std::filesystem::exists(csv_path)) throw std::runtime_error("IMU CSV already exists: "+csv_path.u8string());
     std::ofstream csv(csv_path);
     if (!csv) throw std::runtime_error("cannot create IMU CSV");
-    csv << "host_elapsed_s,device_elapsed_s,tick24,state,valid,yaw_deg,pitch_deg,roll_deg,qw,qx,qy,qz,gx_rad_s,gy_rad_s,gz_rad_s,ax_mps2,ay_mps2,az_mps2,recenter_count,sensor_worn,sensor_status_raw,sensor_ir_raw\n";
+    csv << "host_elapsed_s,device_elapsed_s,tick24,state,valid,yaw_deg,pitch_deg,roll_deg,qw,qx,qy,qz,gx_rad_s,gy_rad_s,gz_rad_s,ax_mps2,ay_mps2,az_mps2,recenter_count,sensor_worn,sensor_status_raw,sensor_ir_raw,sensor_buttons_raw,sensor_volume_raw,sensor_headset_flags_raw\n";
     const auto pid = static_cast<int>(GetCurrentProcessId());
     EventHandle recenter_event{CreateEventW(nullptr,FALSE,FALSE,event_name(pid).c_str())};
     EventHandle calibrate_event{CreateEventW(nullptr,FALSE,FALSE,event_name(pid,L"Calibrate").c_str())};
@@ -87,7 +92,7 @@ int capture_imu(hid_device* sensor, WinUsbControl* control, const Options& optio
     unsigned int previous_sequence = 0, previous_last_tick = 0;
     bool have_sequence = false, scheduled_recenter = false;
     ImuState previous_state = ImuState::warming;
-    const auto start = Clock::now();
+    const auto start = now();
     const auto deadline = options.duration_ms ? start+std::chrono::milliseconds(options.duration_ms) : Clock::time_point::max();
     auto next_output = start;
     auto next_control = start;
@@ -98,12 +103,13 @@ int capture_imu(hid_device* sensor, WinUsbControl* control, const Options& optio
     const auto input = GetStdHandle(STD_INPUT_HANDLE);
     CaptureTerminal terminal(options.json_stream,log);
     const auto finish = [&](int code,const char* reason) { terminal.end(reason); return code; };
-    const auto host_ms = [&] { return std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now()-start).count(); };
+    const auto host_ms = [&] { return std::chrono::duration_cast<std::chrono::milliseconds>(now()-start).count(); };
     log("INFO","IMU capture: place headset on a stable surface, hands off during calibration; recenter afterwards changes reference, NOT gyro bias");
     log("INFO","IMU CSV="+std::filesystem::absolute(csv_path).u8string());
     log("INFO","IMU recenter: R in this console or psvr_diag --recenter "+std::to_string(pid)+"; C restarts calibration; mode="+options.tracking.recenter_mode);
     if (!options.axis_test.empty()) log("INFO","axis-test="+options.axis_test+": wait for TRACKING (calibration_ms="+
-        std::to_string(options.tracking.calibration_ms)+"), then move 20-40 degrees in requested direction and HOLD");
+        std::to_string(options.tracking.calibration_ms)+
+        "); baseline is captured at calibration completion; manual recenter is disabled; then move 20-40 degrees in requested direction and HOLD");
     const auto state_event = [&](ImuState state, const char* reason) {
         if (options.json_stream) log("DATA",nlohmann::json{{"schema_version",1},{"event","imu_state"},
             {"state",state_name(state)},{"valid",state == ImuState::tracking},{"reason",reason}}.dump());
@@ -111,13 +117,30 @@ int capture_imu(hid_device* sensor, WinUsbControl* control, const Options& optio
     const auto vector_json = [](Vec3 v) { return nlohmann::json::array({v.x,v.y,v.z}); };
     state_event(ImuState::warming,"capture-started");
     int result = 0;
-    while (Clock::now() < deadline && !interrupted.load()) {
+    const auto check_progress = [&] {
+        const auto failure = progress.failure(host_ms(),fusion.state() == ImuState::tracking,options.tracking.stale_timeout_ms);
+        if (failure == ProgressFailure::none) return true;
+        if (failure == ProgressFailure::no_reports) {
+            log("ERROR","IMU no sensor reports within startup timeout; check headset power");
+            state_event(ImuState::lost,"no-sensor-reports"); result = 4;
+        } else {
+            fusion.mark_lost();
+            log("ERROR","IMU stream has no advancing samples: pose invalid, restart capture/calibration required");
+            state_event(fusion.state(),"no-advancing-samples"); result = 7;
+        }
+        return false;
+    };
+    while (now() < deadline && !interrupted.load()) {
         const auto stop_result = WaitForSingleObject(stop_event.value,0);
         if (stop_result == WAIT_FAILED) throw std::runtime_error("stop event wait failed");
         if (stop_result == WAIT_OBJECT_0) { stopped = true; break; }
         std::array<unsigned char,512> buffer{};
         const auto count = hid_read_timeout(sensor,buffer.data(),buffer.size(),10);
         if (count < 0) { log("ERROR","IMU HID read failed: "+utf8(hid_read_error(sensor))); state_event(ImuState::lost,"sensor-read-failed"); result = 3; break; }
+        // Check the PREVIOUS progress before buffered data can refresh it.
+        // The configured limits remain inclusive: ordinary jitter and a gap
+        // exactly at stale_timeout_ms are still accepted.
+        if (!check_progress()) break;
         if (count > 0) {
             ++reports;
             progress.report_received();
@@ -146,7 +169,7 @@ int capture_imu(hid_device* sensor, WinUsbControl* control, const Options& optio
         }
         // F0 is event-driven. Optional GUI telemetry reads the documented USB IN
         // pipe only; no status-query command and no interpretation of unknown bits.
-        if (options.json_stream && control && Clock::now() >= next_control) {
+        if (options.json_stream && control && now() >= next_control) {
             try {
                 const auto bytes = control->read(1);
                 if (const auto status = decode_status(bytes.data(),bytes.size())) {
@@ -159,16 +182,9 @@ int capture_imu(hid_device* sensor, WinUsbControl* control, const Options& optio
                 log("ERROR",std::string("IMU control polling failed: ")+error.what());
                 state_event(ImuState::lost,"control-read-failed"); result = 3; break;
             }
-            next_control = Clock::now()+std::chrono::milliseconds(50);
+            next_control = now()+std::chrono::milliseconds(50);
         }
-        const auto progress_failure = progress.failure(host_ms(),fusion.state() == ImuState::tracking,options.tracking.stale_timeout_ms);
-        if (progress_failure == ProgressFailure::no_reports) {
-            log("ERROR","IMU no sensor reports within startup timeout; check headset power");
-            state_event(ImuState::lost,"no-sensor-reports"); result = 4; break;
-        }
-        if (progress_failure == ProgressFailure::no_advancing_samples) {
-            fusion.mark_lost(); log("ERROR","IMU stream has no advancing samples: pose invalid, restart capture/calibration required");
-        }
+        if (!check_progress()) break;
         if (fusion.state() != previous_state) {
             log("INFO",std::string("IMU state=")+state_name(fusion.state()));
             state_event(fusion.state(),fusion.state() == ImuState::calibration_failed ? fusion.calibration_error().c_str() : "fusion-transition");
@@ -187,7 +203,7 @@ int capture_imu(hid_device* sensor, WinUsbControl* control, const Options& optio
                 "clock/stream discontinuity")+"; no assumed orientation");
             result = 7; break;
         }
-        const auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(Clock::now()-start).count();
+        const auto elapsed_ms = host_ms();
         const auto key = console_key(input);
         const auto wait_result = WaitForSingleObject(recenter_event.value,0);
         if (wait_result == WAIT_FAILED) throw std::runtime_error("recenter event wait failed");
@@ -200,7 +216,7 @@ int capture_imu(hid_device* sensor, WinUsbControl* control, const Options& optio
                 const auto a = angles(fusion.orientation());
                 log("INFO","IMU RECENTER verified yaw_deg="+std::to_string(a.yaw)+" pitch_deg="+std::to_string(a.pitch)+
                     " roll_deg="+std::to_string(a.roll)+" count="+std::to_string(fusion.recenter_count));
-                stats = {}; next_output = Clock::now();
+                stats = {}; next_output = now();
             } else log("WARN","recenter ignored: calibration not ready");
         }
         const auto calibrate_result = WaitForSingleObject(calibrate_event.value,0);
@@ -210,7 +226,7 @@ int capture_imu(hid_device* sensor, WinUsbControl* control, const Options& optio
             else { fusion.restart_calibration(); stats = {}; previous_state = ImuState::warming;
                 state_event(ImuState::warming,"operator-recalibration"); log("INFO","IMU calibration restarted by operator"); }
         }
-        if (Clock::now() >= next_output) {
+        if (now() >= next_output) {
             const auto q = fusion.output(); const auto a = angles(q);
             const auto gyro = fusion.gyro(), accel = fusion.accel();
             const bool valid = fusion.state() == ImuState::tracking;
@@ -221,14 +237,18 @@ int capture_imu(hid_device* sensor, WinUsbControl* control, const Options& optio
                  << " quat_wxyz=(" << q.w << ',' << q.x << ',' << q.y << ',' << q.z << ')';
             log("INFO",line.str());
             if (options.json_stream && have_sequence) {
-                const auto host_elapsed = std::chrono::duration<double>(Clock::now()-start).count();
+                const auto sensor_q = fusion.sensor_orientation();
+                const auto host_elapsed = std::chrono::duration<double>(now()-start).count();
                 log("DATA",nlohmann::json{{"schema_version",1},{"event","imu"},{"host_elapsed_s",host_elapsed},
                     {"device_elapsed_s",fusion.elapsed_s()},{"tick24",latest_tick},{"state",state_name(fusion.state())},{"valid",valid},
                     {"angles_deg",{{"yaw",a.yaw},{"pitch",a.pitch},{"roll",a.roll}}},
                     {"quaternion_wxyz",nlohmann::json::array({q.w,q.x,q.y,q.z})},{"gyro_rad_s",vector_json(gyro)},
+                    {"quaternion_sensor_wxyz",nlohmann::json::array({sensor_q.w,sensor_q.x,sensor_q.y,sensor_q.z})},
                     {"corrected_gyro_rad_s",vector_json(fusion.corrected_gyro())},{"accel_mps2",vector_json(accel)},
                     {"recenter_count",fusion.recenter_count},
                     {"sensor",{{"worn",latest_sensor.worn()},{"status_raw",latest_sensor.status_raw},{"ir_raw",latest_sensor.ir_raw},
+                               {"buttons_raw",latest_sensor.buttons_raw},{"volume_raw",latest_sensor.volume_raw},
+                               {"headset_flags_raw",latest_sensor.headset_flags_raw},
                                {"display_flag_raw",(latest_sensor.status_raw & 2) != 0}}},
                     {"calibration",{{"samples",fusion.calibration_gyro().count},{"target_ms",options.tracking.calibration_ms},
                         {"elapsed_ms",fusion.calibration_elapsed_ms()},{"gyro_mean_dps",vector_json(fusion.calibration_gyro().mean*degrees)},
@@ -242,13 +262,14 @@ int capture_imu(hid_device* sensor, WinUsbControl* control, const Options& optio
             csv << std::setprecision(12) << elapsed_ms*0.001 << ',' << fusion.elapsed_s() << ',' << latest_tick << ',' << state_name(fusion.state()) << ',' << valid
                 << ',' << a.yaw << ',' << a.pitch << ',' << a.roll << ',' << q.w << ',' << q.x << ',' << q.y << ',' << q.z
                 << ',' << gyro.x << ',' << gyro.y << ',' << gyro.z << ',' << accel.x << ',' << accel.y << ',' << accel.z << ',' << fusion.recenter_count
-                << ',' << latest_sensor.worn() << ',' << unsigned(latest_sensor.status_raw) << ',' << latest_sensor.ir_raw << '\n';
+                << ',' << latest_sensor.worn() << ',' << unsigned(latest_sensor.status_raw) << ',' << latest_sensor.ir_raw
+                << ',' << unsigned(latest_sensor.buttons_raw) << ',' << unsigned(latest_sensor.volume_raw) << ',' << unsigned(latest_sensor.headset_flags_raw) << '\n';
             if (!csv) throw std::runtime_error("IMU CSV write failed");
-            next_output = Clock::now()+std::chrono::milliseconds(options.tracking.output_interval_ms);
+            next_output = now()+std::chrono::milliseconds(options.tracking.output_interval_ms);
         }
     }
     csv.flush(); if (!csv) throw std::runtime_error("IMU CSV flush failed");
-    const auto seconds = std::chrono::duration<double>(Clock::now()-start).count();
+    const auto seconds = std::chrono::duration<double>(now()-start).count();
     std::ostringstream summary;
     summary << std::fixed << std::setprecision(6) << "IMU summary reports=" << reports << " report_hz=" << reports/seconds
             << " samples=" << fusion.samples << " integrated=" << fusion.integrated << " integrated_s=" << fusion.integrated_us*1e-6

@@ -1,0 +1,453 @@
+diff --git a/src/ps3eye.cpp b/src/ps3eye.cpp
+index 98d0e01..cdd3f86 100644
+--- a/src/ps3eye.cpp
++++ b/src/ps3eye.cpp
+@@ -5,6 +5,7 @@
+ #include <mutex>
+ #include <condition_variable>
+ #include <atomic>
++#include <chrono>
+ 
+ #if defined WIN32 || defined _WIN32 || defined WINCE
+ 	#include <windows.h>
+@@ -435,7 +436,8 @@ public:
+ 		frame_buffer		((uint8_t*)malloc(frame_size * num_frames)),
+ 		head				(0),
+ 		tail				(0),
+-		available			(0)
++		available			(0),
++		closed				(false)
+ 	{
+ 	}
+ 
+@@ -480,12 +482,27 @@ public:
+ 		return new_frame;
+ 	}
+ 
+-	void Dequeue(uint8_t* new_frame, int frame_width, int frame_height, PS3EYECam::EOutputFormat outputFormat)
++	bool Dequeue(uint8_t* new_frame, int frame_width, int frame_height, PS3EYECam::EOutputFormat outputFormat, int timeout_ms)
+ 	{		
+ 		std::unique_lock<std::mutex> lock(mutex);
+ 
+-		// If there is no data in the buffer, wait until data becomes available
+-		empty_condition.wait(lock, [this] () { return available != 0; });
++		// If there is no data in the buffer, wait until data becomes available,
++		// the timeout expires (timeout_ms >= 0), or the queue is aborted.
++		if (timeout_ms < 0)
++		{
++			empty_condition.wait(lock, [this] () { return available != 0 || closed; });
++		}
++		else
++		{
++			empty_condition.wait_for(lock, std::chrono::milliseconds(timeout_ms),
++				[this] () { return available != 0 || closed; });
++		}
++
++		if (available == 0)
++		{
++			// Timed out (or was aborted) before a complete frame arrived.
++			return false;
++		}
+ 
+ 		// Copy from internal buffer
+ 		uint8_t* source = frame_buffer + frame_size * tail;
+@@ -506,6 +523,16 @@ public:
+ 		// Update tail and available count
+ 		tail = (tail + 1) % num_frames;
+ 		available--;
++
++		return true;
++	}
++
++	// Wake a consumer blocked in Dequeue() and make it return without a frame.
++	void Abort()
++	{
++		std::lock_guard<std::mutex> lock(mutex);
++		closed = true;
++		empty_condition.notify_all();
+ 	}
+ 	
+ 	void DebayerGray(int frame_width, int frame_height, const uint8_t* inBayer, uint8_t* outBuffer)
+@@ -719,6 +746,7 @@ private:
+ 	uint32_t				head;
+ 	uint32_t				tail;
+ 	uint32_t				available;
++	bool					closed;
+ 
+ 	std::mutex				mutex;
+ 	std::condition_variable	empty_condition;
+@@ -738,7 +766,8 @@ public:
+ 		cur_frame_start			(NULL),
+ 		cur_frame_data_len		(0),
+ 		frame_size				(0),
+-		frame_queue				(NULL)
++		frame_queue				(),
++		transfers_started		(false)
+ 	{
+ 	}
+ 
+@@ -748,14 +777,28 @@ public:
+ 		close_transfers();
+ 	}
+ 
++	std::shared_ptr<FrameQueue> getFrameQueue()
++	{
++		std::lock_guard<std::mutex> lock(frame_queue_mutex);
++		return frame_queue;
++	}
++
++	void setFrameQueue(std::shared_ptr<FrameQueue> queue)
++	{
++		std::lock_guard<std::mutex> lock(frame_queue_mutex);
++		frame_queue = std::move(queue);
++	}
++
+ 	bool start_transfers(libusb_device_handle *handle, uint32_t curr_frame_size)
+ 	{
+-		// Initialize the frame queue
++		// Initialize the frame queue. It is held by a shared_ptr so a consumer
++		// blocked in Dequeue() keeps it alive if close_transfers() runs.
+         frame_size = curr_frame_size;
+-		frame_queue = new FrameQueue(frame_size);
++		std::shared_ptr<FrameQueue> queue(new FrameQueue(frame_size));
++		setFrameQueue(queue);
+ 
+ 		// Initialize the current frame pointer to the start of the buffer; it will be updated as frames are completed and pushed onto the frame queue
+-		cur_frame_start = frame_queue->GetFrameBufferStart();
++		cur_frame_start = queue->GetFrameBufferStart();
+ 		cur_frame_data_len = 0;
+ 
+ 		// Find the bulk transfer endpoint
+@@ -767,15 +810,32 @@ public:
+ 		memset(transfer_buffer, 0, TRANSFER_SIZE * NUM_TRANSFERS);
+ 
+ 		int res = 0;
++		transfers_started = true;
+ 		for (int index = 0; index < NUM_TRANSFERS; ++index)
+ 		{
+ 			// Create & submit the transfer
+-			xfr[index] = libusb_alloc_transfer(0);
+-			libusb_fill_bulk_transfer(xfr[index], handle, bulk_endpoint, transfer_buffer + index * TRANSFER_SIZE, TRANSFER_SIZE, transfer_completed_callback, reinterpret_cast<void*>(this), 0);
++			libusb_transfer *transfer = libusb_alloc_transfer(0);
++			libusb_fill_bulk_transfer(transfer, handle, bulk_endpoint, transfer_buffer + index * TRANSFER_SIZE, TRANSFER_SIZE, transfer_completed_callback, reinterpret_cast<void*>(this), 0);
+ 
+-			res |= libusb_submit_transfer(xfr[index]);
+-			
+-			num_active_transfers++;
++			// Publish the slot and count the transfer as active before
++			// submitting: the completion callback (which decrements the count
++			// and clears the slot) must never run first.
++			{
++				std::lock_guard<std::mutex> lock(num_active_transfers_mutex);
++				xfr[index] = transfer;
++				num_active_transfers++;
++			}
++			int submit = libusb_submit_transfer(transfer);
++			if (submit != 0)
++			{
++				// A transfer that was never submitted gets no completion
++				// callback, so it must not stay counted as active.
++				res = submit;
++				std::lock_guard<std::mutex> lock(num_active_transfers_mutex);
++				xfr[index] = NULL;
++				num_active_transfers--;
++				libusb_free_transfer(transfer);
++			}
+ 		}
+ 
+ 		last_pts = 0;
+@@ -786,28 +846,65 @@ public:
+ 		return res == 0;
+ 	}
+ 
+-	void close_transfers()
++	// Cancel every live transfer without blocking. Safe to call from the libusb
++	// event thread (a completion callback), where close_transfers() would
++	// deadlock waiting for callbacks that only that same thread can deliver.
++	void cancel_all()
+ 	{
+-		std::unique_lock<std::mutex> lock(num_active_transfers_mutex);
+-		if (num_active_transfers == 0)
+-			return;
+-
+-		// Cancel any pending transfers
++		std::shared_ptr<FrameQueue> queue = getFrameQueue();
++		if (queue) {
++			queue->Abort();
++		}
++		std::lock_guard<std::mutex> lock(num_active_transfers_mutex);
+ 		for (int index = 0; index < NUM_TRANSFERS; ++index)
+ 		{
+-			libusb_cancel_transfer(xfr[index]);
++			if (xfr[index] != NULL) {
++				libusb_cancel_transfer(xfr[index]);
++			}
+ 		}
++	}
+ 
+-		// Wait for cancelation to finish
+-		num_active_transfers_condition.wait(lock, [this]() { return num_active_transfers == 0; });
++	void close_transfers()
++	{
++		// Wake any consumer blocked in Dequeue() before tearing anything down.
++		std::shared_ptr<FrameQueue> queue = getFrameQueue();
++		if (queue) {
++			queue->Abort();
++		}
+ 
+-		USBMgr::instance()->cameraStopped();
++		{
++			std::unique_lock<std::mutex> lock(num_active_transfers_mutex);
++			if (num_active_transfers != 0)
++			{
++				// Cancel any pending transfers
++				for (int index = 0; index < NUM_TRANSFERS; ++index)
++				{
++					if (xfr[index] != NULL) {
++						libusb_cancel_transfer(xfr[index]);
++					}
++				}
+ 
+-		free(transfer_buffer);
+-		transfer_buffer = NULL;
++				// Wait for cancelation to finish. This runs on the caller's
++				// thread (stop/close/destructor), not on the event thread, so
++				// the cancellations can be delivered.
++				num_active_transfers_condition.wait(lock, [this]() { return num_active_transfers == 0; });
++			}
++		}
+ 
+-		delete frame_queue;
+-		frame_queue = NULL;
++		if (transfers_started)
++		{
++			USBMgr::instance()->cameraStopped();
++			transfers_started = false;
++		}
++
++		if (transfer_buffer != NULL)
++		{
++			free(transfer_buffer);
++			transfer_buffer = NULL;
++		}
++
++		// Drop our reference; a consumer still inside Dequeue() keeps it alive.
++		setFrameQueue(nullptr);
+ 	}
+ 
+ 	void transfer_canceled()
+@@ -857,7 +954,10 @@ public:
+ 
+ 	    if (packet_type == LAST_PACKET) {        
+ 			cur_frame_data_len = 0;
+-			cur_frame_start = frame_queue->Enqueue();
++			std::shared_ptr<FrameQueue> queue = getFrameQueue();
++			if (queue) {
++				cur_frame_start = queue->Enqueue();
++			}
+ 	        //debug("frame completed %d\n", frame_complete_ind);
+ 	    }
+ 	}
+@@ -949,7 +1049,9 @@ public:
+     uint8_t*				cur_frame_start;
+ 	uint32_t				cur_frame_data_len;
+ 	uint32_t				frame_size;
+-	FrameQueue*				frame_queue;
++	std::shared_ptr<FrameQueue>	frame_queue;
++	std::mutex				frame_queue_mutex;
++	bool					transfers_started;
+ };
+ 
+ static void LIBUSB_CALL transfer_completed_callback(struct libusb_transfer *xfr)
+@@ -961,12 +1063,26 @@ static void LIBUSB_CALL transfer_completed_callback(struct libusb_transfer *xfr)
+     {
+         debug("transfer status %d\n", status);
+ 
++        // Clear the slot before freeing so a later close_transfers()/
++        // cancel_all() does not touch a dangling transfer. The slot array is
++        // guarded by num_active_transfers_mutex.
++        {
++            std::lock_guard<std::mutex> lock(urb->num_active_transfers_mutex);
++            for (int index = 0; index < NUM_TRANSFERS; ++index) {
++                if (urb->xfr[index] == xfr) {
++                    urb->xfr[index] = NULL;
++                    break;
++                }
++            }
++        }
+         libusb_free_transfer(xfr);
+ 		urb->transfer_canceled();
+         
+         if(status != LIBUSB_TRANSFER_CANCELLED)
+         {
+-            urb->close_transfers();
++            // On the libusb event thread: never block waiting for other
++            // cancellations here or the event thread deadlocks.
++            urb->cancel_all();
+         }
+         return;
+     }
+@@ -977,7 +1093,7 @@ static void LIBUSB_CALL transfer_completed_callback(struct libusb_transfer *xfr)
+ 
+     if (libusb_submit_transfer(xfr) < 0) {
+         debug("error re-submitting URB\n");
+-        urb->close_transfers();
++        urb->cancel_all();
+     }
+ }
+ 
+@@ -1150,6 +1266,10 @@ void PS3EYECam::stop()
+ 	ov534_reg_write(0xe0, 0x09);
+ 	ov534_set_led(0);
+     
++	// Wake any consumer blocked in getFrame()/tryGetFrame() so it returns
++	// before the frame queue is torn down.
++	abortFrameWait();
++
+ 	// close urb
+ 	urb->close_transfers();
+ 
+@@ -1216,7 +1336,33 @@ uint32_t PS3EYECam::getOutputBytesPerPixel() const
+ 
+ void PS3EYECam::getFrame(uint8_t* frame)
+ {
+-	urb->frame_queue->Dequeue(frame, frame_width, frame_height, frame_output_format);
++	std::shared_ptr<FrameQueue> queue = urb->getFrameQueue();
++	if (queue)
++	{
++		queue->Dequeue(frame, frame_width, frame_height, frame_output_format, -1);
++	}
++}
++
++bool PS3EYECam::tryGetFrame(uint8_t* frame, int timeout_ms)
++{
++	std::shared_ptr<FrameQueue> queue = urb->getFrameQueue();
++	if (!queue)
++	{
++		return false;
++	}
++	return queue->Dequeue(frame, frame_width, frame_height, frame_output_format, timeout_ms);
++}
++
++void PS3EYECam::abortFrameWait()
++{
++	if (urb)
++	{
++		std::shared_ptr<FrameQueue> queue = urb->getFrameQueue();
++		if (queue)
++		{
++			queue->Abort();
++		}
++	}
+ }
+ 
+ bool PS3EYECam::open_usb()
+diff --git a/src/ps3eye.h b/src/ps3eye.h
+index 3c801d8..7d5047e 100644
+--- a/src/ps3eye.h
++++ b/src/ps3eye.h
+@@ -172,6 +172,16 @@ public:
+ 	// - The output buffer must be sized correctly, depending out the output format. See EOutputFormat.
+ 	void getFrame(uint8_t* frame);
+ 
++	// Get a frame from the camera, waiting at most timeout_ms milliseconds.
++	// Returns true when a frame was copied into frame, false on timeout or once
++	// streaming has been stopped. timeout_ms < 0 waits indefinitely (getFrame).
++	// The output buffer must be sized correctly, depending on the output format.
++	bool tryGetFrame(uint8_t* frame, int timeout_ms);
++
++	// Wake a consumer blocked in getFrame()/tryGetFrame() and make it return
++	// without copying a frame. Safe to call from another thread.
++	void abortFrameWait();
++
+ 	uint32_t getWidth() const { return frame_width; }
+ 	uint32_t getHeight() const { return frame_height; }
+ 	uint16_t getFrameRate() const { return frame_rate; }
+diff --git a/src/ps3eye_capi.cpp b/src/ps3eye_capi.cpp
+index 34be865..b7087bb 100644
+--- a/src/ps3eye_capi.cpp
++++ b/src/ps3eye_capi.cpp
+@@ -154,6 +154,49 @@ ps3eye_grab_frame(ps3eye_t *eye, unsigned char* frame)
+ 	eye->eye->getFrame(frame);
+ }
+ 
++int
++ps3eye_grab_frame_timeout(ps3eye_t *eye, unsigned char* frame, int timeout_ms)
++{
++    if (!ps3eye_context) {
++        // No context available
++        return -1;
++    }
++
++    if (!eye) {
++        // Eye is not a valid handle
++        return -1;
++    }
++
++    return eye->eye->tryGetFrame(frame, timeout_ms) ? 1 : 0;
++}
++
++void
++ps3eye_abort_frame(ps3eye_t *eye)
++{
++    if (!ps3eye_context) {
++        // No context available
++        return;
++    }
++
++    if (!eye) {
++        // Eye is not a valid handle
++        return;
++    }
++
++    eye->eye->abortFrameWait();
++}
++
++int
++ps3eye_get_frame_rate(ps3eye_t *eye)
++{
++    if (!eye) {
++        // Eye is not a valid handle
++        return 0;
++    }
++
++    return (int)eye->eye->getFrameRate();
++}
++
+ void
+ ps3eye_close(ps3eye_t *eye)
+ {
+diff --git a/src/ps3eye_capi.h b/src/ps3eye_capi.h
+index eb64191..6d34abd 100644
+--- a/src/ps3eye_capi.h
++++ b/src/ps3eye_capi.h
+@@ -105,6 +105,29 @@ ps3eye_get_unique_identifier(ps3eye_t * eye, char *out_identifier, int max_ident
+ void
+ ps3eye_grab_frame(ps3eye_t *eye, unsigned char* frame);
+ 
++/**
++ * Grab the next frame, waiting at most timeout_ms milliseconds.
++ * Returns 1 when a frame was copied into frame, 0 on timeout (or once the
++ * stream has been stopped), and -1 on an invalid handle.
++ * A timeout_ms < 0 waits indefinitely (same as ps3eye_grab_frame()).
++ **/
++int
++ps3eye_grab_frame_timeout(ps3eye_t *eye, unsigned char* frame, int timeout_ms);
++
++/**
++ * Wake a thread blocked in ps3eye_grab_frame()/ps3eye_grab_frame_timeout()
++ * so it returns without a frame. Safe to call from another thread.
++ **/
++void
++ps3eye_abort_frame(ps3eye_t *eye);
++
++/**
++ * Return the frame rate the device actually negotiated (the requested rate is
++ * snapped to the nearest rate the sensor supports), or 0 if unavailable.
++ **/
++int
++ps3eye_get_frame_rate(ps3eye_t *eye);
++
+ /**
+  * Close a PSEye camera device and free allocated resources.
+  * To really close the library, you should also call ps3eye_uninit().

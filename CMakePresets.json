@@ -7,7 +7,10 @@
       "generator": "Visual Studio 17 2022",
       "architecture": "x64",
       "binaryDir": "${sourceDir}/build/vs2022",
-      "cacheVariables": { "BUILD_TESTING": "ON" }
+      "cacheVariables": {
+        "BUILD_TESTING": "ON",
+        "PSVR_DRIVER_PACKAGE": "${sourceDir}/out/driver_psvrpc_msvc/psvrpc"
+      }
     },
     {
       "name": "mingw",
@@ -15,7 +18,8 @@
       "binaryDir": "${sourceDir}/build/mingw",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "RelWithDebInfo",
-        "BUILD_TESTING": "ON"
+        "BUILD_TESTING": "ON",
+        "PSVR_DRIVER_PACKAGE": "${sourceDir}/out/driver_psvrpc/psvrpc"
       }
     }
   ]

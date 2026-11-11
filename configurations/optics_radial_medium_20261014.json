@@ -1,0 +1,10 @@
+{
+  "schema_version": 1,
+  "name": "PSVR diagnostic radial medium k1=0.10 - NOT calibrated",
+  "uv_convention": "eye-local-top-left",
+  "mapping": "display-to-render",
+  "eyes": {
+    "left": {"center": [0.5, 0.5], "axis_scale": [0.8888888888888888, 1.0], "polynomial": {"a": 0.0, "b": 0.4, "c": 0.0, "d": 1.0}, "rgb_scale": {"red": 1.0, "green": 1.0, "blue": 1.0}},
+    "right": {"center": [0.5, 0.5], "axis_scale": [0.8888888888888888, 1.0], "polynomial": {"a": 0.0, "b": 0.4, "c": 0.0, "d": 1.0}, "rgb_scale": {"red": 1.0, "green": 1.0, "blue": 1.0}}
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "backend": "pseye",
+  "index": 0,
+  "image_size": [640, 480],
+  "lens_selector": "blue",
+  "requested_fps": 75,
+  "exposure": 13,
+  "gain": 0,
+  "auto_gain": false,
+  "auto_white_balance": false,
+  "detector": {
+    "value_min": 60,
+    "min_area": 6,
+    "saturation_min": 90,
+    "opening_size": 0,
+    "include_white_cores": true
+  },
+  "intrinsics": "configurations/pseye_blue_640x480_calibrated.json",
+  "rotation_rig": "configurations/psvr_nine_leds_refined_sides_20261011.json",
+  "notes": "User screenshot confirms brightness threshold 60, acquisition area 6px, exposure 13 and gain 0; user reports successful 180-degree rotation. These are the current led-track CLI defaults. This JSON is a recorded reference, not an automatically loaded CLI profile. Physical scale and anatomical head origin remain unvalidated."
+}

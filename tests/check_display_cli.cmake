@@ -1,0 +1,11 @@
+# Read-only CLI argument tests: do not call the enumeration path.
+execute_process(COMMAND "${DISPLAY}" --help RESULT_VARIABLE result OUTPUT_VARIABLE output)
+if(NOT result EQUAL 0 OR NOT output MATCHES "Read-only active Windows display inventory")
+    message(FATAL_ERROR "display --help failed: ${result}: ${output}")
+endif()
+foreach(args "--unknown" "--json;--json" "--json;--help")
+    execute_process(COMMAND "${DISPLAY}" ${args} RESULT_VARIABLE result OUTPUT_VARIABLE output ERROR_VARIABLE error)
+    if(NOT result EQUAL 1)
+        message(FATAL_ERROR "display invalid args ${args}: expected exit 1 got ${result}")
+    endif()
+endforeach()

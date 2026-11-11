@@ -1,0 +1,36 @@
+--- a/libusb/os/windows_winusb.c
++++ b/libusb/os/windows_winusb.c
+@@ -3009,6 +3009,17 @@
+ 				return LIBUSB_ERROR_IO;
+ 			}
+ 		} else {
++			/* libusbK 3.0.7's libusb0 backend may leave LengthTransferred
++			 * untouched for an overlapped request, including immediate success.
++			 * Query the actual OVERLAPPED result, never publish stack garbage. */
++			if (sub_api == SUB_API_LIBUSB0) {
++				if (!GetOverlappedResult(handle_priv->interface_handle[current_interface].dev_handle,
++						overlapped, &transferred, FALSE)) {
++					/* Already accepted: IOCP owns pending/error completion.
++					 * Do not free a transfer with a queued completion. */
++					return LIBUSB_SUCCESS;
++				}
++			}
+ 			windows_force_sync_completion(itransfer, transferred);
+ 		}
+ 	}
+--- a/libusb/sync.c
++++ b/libusb/sync.c
+@@ -137,6 +137,13 @@
+ 
+ 	sync_transfer_wait_for_completion(transfer);
+ 
++	/* Never let a backend's invalid length escape the allocated setup/data
++	 * buffer or overwrite the caller's wLength-sized buffer. */
++	if (transfer->actual_length < 0 || transfer->actual_length > wLength) {
++		libusb_free_transfer(transfer);
++		return LIBUSB_ERROR_OVERFLOW;
++	}
++
+ 	if ((bmRequestType & LIBUSB_ENDPOINT_DIR_MASK) == LIBUSB_ENDPOINT_IN)
+ 		memcpy(data, libusb_control_transfer_get_data(transfer),
+ 			transfer->actual_length);

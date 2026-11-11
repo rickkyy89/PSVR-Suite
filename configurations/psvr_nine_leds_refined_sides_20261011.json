@@ -1,0 +1,145 @@
+{
+  "schema": "psvr.camera.rotation_led_rig",
+  "version": 1,
+  "provenance": "refined_front_and_imu_anchored_side_rays",
+  "source": "https://github.com/psmoveservice/PSMoveService/blob/22bbe20e9de53f3f3581137bce7b88e2587a27e7/src/psmoveservice/MorpheusHMD/MorpheusHMD.cpp#getTrackingShape",
+  "notes": "Front outline from accepted relative refinement. Right-side LED refined using IMU rotation and translation from front anchors, with held-out validation. Left-side and rear coordinates retain external ruler estimates due to insufficient independent views. Normals are visibility hypotheses, not measured optical emission lobes. Origin front centre LED; physical scale and anatomical head offset unvalidated.",
+  "labels": [
+    "upper_left",
+    "upper_right",
+    "centre",
+    "lower_left",
+    "lower_right",
+    "side_left",
+    "side_right",
+    "rear_left",
+    "rear_right"
+  ],
+  "object_points_m": [
+    [
+      -0.08,
+      -0.05288222661924354,
+      0.025
+    ],
+    [
+      0.08,
+      -0.05288222661924354,
+      0.025
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      -0.07838395277729067,
+      0.053373439590696424,
+      0.025
+    ],
+    [
+      0.07838395277729067,
+      0.053373439590696424,
+      0.025
+    ],
+    [
+      -0.09,
+      0.0,
+      0.1
+    ],
+    [
+      0.10136894832484451,
+      -0.004385357276405027,
+      0.08892377364184538
+    ],
+    [
+      -0.06,
+      0.01,
+      0.24
+    ],
+    [
+      0.06,
+      0.01,
+      0.24
+    ]
+  ],
+  "outward_normals": [
+    [
+      -0.4,
+      0,
+      -0.9165
+    ],
+    [
+      0.4,
+      0,
+      -0.9165
+    ],
+    [
+      0,
+      0,
+      -1
+    ],
+    [
+      -0.4,
+      0,
+      -0.9165
+    ],
+    [
+      0.4,
+      0,
+      -0.9165
+    ],
+    [
+      -1,
+      0,
+      0
+    ],
+    [
+      1,
+      0,
+      0
+    ],
+    [
+      -0.3,
+      0,
+      0.954
+    ],
+    [
+      0.3,
+      0,
+      0.954
+    ]
+  ],
+  "rotation_refinement": {
+    "log": "logs/led_imu_sensor_basis_20261011.jsonl",
+    "report": {
+      "side_left": {
+        "views": 10,
+        "accepted": false,
+        "reason": "insufficient independent angular views"
+      },
+      "side_right": {
+        "views": 52,
+        "accepted": true,
+        "before_median_px": 6.70650793934173,
+        "after_median_px": 0.45394297369017816,
+        "after_p90_px": 0.9583668007675675,
+        "proposed_point_m": [
+          0.10136894832484451,
+          -0.004385357276405027,
+          0.08892377364184538
+        ]
+      },
+      "rear_left": {
+        "views": 0,
+        "accepted": false,
+        "reason": "insufficient independent angular views"
+      },
+      "rear_right": {
+        "views": 0,
+        "accepted": false,
+        "reason": "insufficient independent angular views"
+      }
+    },
+    "physical_scale_validated": false
+  }
+}

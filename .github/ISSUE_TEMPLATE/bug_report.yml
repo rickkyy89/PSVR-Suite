@@ -1,0 +1,44 @@
+name: Bug report
+description: Local pre-release bug (no live-hardware changes from here)
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      placeholder: "0.3.0-alpha"
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Hardware / OS
+      placeholder: "PSVR1, Windows 11 x64, PS3 Eye yes/no"
+    validations:
+      required: true
+  - type: textarea
+    id: settings
+    attributes:
+      label: Settings changed (distortion / filter / fallback / FOV)
+      placeholder: "identity, one_euro 2.5/8, fallback off, H78.267/V84.939 ..."
+  - type: textarea
+    id: repro
+    attributes:
+      label: Repro steps + commands + exit codes
+      placeholder: "build.ps1, run_suite.ps1 -Attach, ...; $LASTEXITCODE"
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Bounded log excerpt (max ~60 lines, no full dumps)
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: No placeholder PayPal links / credentials attached
+        - label: Optics/FOV numbers quoted as diagnostic, not calibration
+        - label: Fallback left at user choice (default off)

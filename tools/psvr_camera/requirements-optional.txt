@@ -1,0 +1,20 @@
+# Optional dependencies for tools/psvr_camera.
+#
+# These are NOT installed automatically and MUST NOT be installed globally by
+# the tools. The parent environment owns camera dependencies; the parent creates
+# a local venv and installs the wheel there. NumPy is already a project
+# dependency; the geometry/calibration math and the UDP protocol work without
+# OpenCV. The native PS3 Eye capture path also works without OpenCV, but ArUco
+# and chessboard detection need it.
+#
+# Headless is enough for the tools (no GUI windows are opened):
+#   python -m pip install opencv-contrib-python-headless
+#
+# opencv-contrib-python is required for ArUco detection/generation; plain
+# opencv-python is enough for capture and chessboard detection.
+numpy>=1.24
+opencv-contrib-python-headless>=4.8  # optional: ArUco detection and pattern aruco
+
+# Nota B14-07: i pin autoritativi testati (versione esatta) sono in
+# requirements-suite.txt alla root del repo; qui restano solo vincoli minimi
+# per documentare i requisiti opzionali, non i pin dell'ambiente di test.

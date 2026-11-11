@@ -1,0 +1,22 @@
+{
+  "schema": "psvr.camera.rotation_led_rig",
+  "version": 1,
+  "provenance": "refined_front_external_side_rear_estimates",
+  "source": "https://github.com/psmoveservice/PSMoveService/blob/22bbe20e9de53f3f3581137bce7b88e2587a27e7/src/psmoveservice/MorpheusHMD/MorpheusHMD.cpp#getTrackingShape",
+  "notes": "Front outline from accepted relative refinement. Side/rear coordinates remain external ruler estimates. Normals are visibility hypotheses, not measured optical emission lobes. Origin front centre LED; physical scale and anatomical head offset unvalidated.",
+  "labels": ["upper_left", "upper_right", "centre", "lower_left", "lower_right", "side_left", "side_right", "rear_left", "rear_right"],
+  "object_points_m": [
+    [-0.08,-0.05288222661924354,0.025],
+    [0.08,-0.05288222661924354,0.025],
+    [0,0,0],
+    [-0.07838395277729067,0.053373439590696424,0.025],
+    [0.07838395277729067,0.053373439590696424,0.025],
+    [-0.09,0,0.10], [0.09,0,0.10],
+    [-0.06,0.01,0.24], [0.06,0.01,0.24]
+  ],
+  "outward_normals": [
+    [-0.4,0,-0.9165],[0.4,0,-0.9165],[0,0,-1],
+    [-0.4,0,-0.9165],[0.4,0,-0.9165],
+    [-1,0,0],[1,0,0],[-0.3,0,0.954],[0.3,0,0.954]
+  ]
+}

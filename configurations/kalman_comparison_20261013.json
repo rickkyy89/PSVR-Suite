@@ -1,0 +1,51 @@
+{
+  "one_euro_2.5_8": {"one_euro": {"min_cutoff_hz": 2.5, "beta": 8.0}},
+  "initial_Q3_camera": {
+    "kalman": {"acceleration_std_m_s2": 3.0},
+    "uncertainty": {"depth_variance_factor": 1.0},
+    "prediction_output": "camera"
+  },
+  "optimized_camera": {
+    "kalman": {
+      "acceleration_std_m_s2": 3.0,
+      "adaptive_quiet": true,
+      "quiet_acceleration_std": 0.03,
+      "motion_onset_acceleration_std": 8.0,
+      "quiet_enter_s": 0.25,
+      "quiet_trend_window_s": 0.12,
+      "quiet_speed_enter_m_s": 0.03,
+      "quiet_speed_exit_m_s": 0.08,
+      "quiet_motion_sigma": 3.0,
+      "quiet_innovation_exit_chi2": 7.815,
+      "quiet_coherent_exit_chi2": 11.34,
+      "measurement_speed_noise_allowance_m": 0.015,
+      "recovery_velocity_fit": true
+    },
+    "uncertainty": {"depth_variance_factor": 2.0},
+    "prediction_output": "camera"
+  },
+  "optimized_driver_hold": {
+    "kalman": {
+      "acceleration_std_m_s2": 3.0,
+      "adaptive_quiet": true,
+      "quiet_acceleration_std": 0.03,
+      "motion_onset_acceleration_std": 8.0,
+      "quiet_enter_s": 0.25,
+      "quiet_trend_window_s": 0.12,
+      "quiet_speed_enter_m_s": 0.03,
+      "quiet_speed_exit_m_s": 0.08,
+      "quiet_motion_sigma": 3.0,
+      "quiet_innovation_exit_chi2": 7.815,
+      "quiet_coherent_exit_chi2": 11.34,
+      "measurement_speed_noise_allowance_m": 0.015,
+      "recovery_velocity_fit": true
+    },
+    "uncertainty": {"depth_variance_factor": 2.0},
+    "prediction_output": "driver_hold"
+  },
+  "static_Q1.5_f1": {
+    "kalman": {"acceleration_std_m_s2": 1.5},
+    "uncertainty": {"depth_variance_factor": 1.0},
+    "prediction_output": "camera"
+  }
+}

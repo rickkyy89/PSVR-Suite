@@ -1,0 +1,318 @@
+{
+  "E": [
+    [
+      -6.6535321003296626e-06,
+      0.003182543877112071,
+      -0.0002956830490057125
+    ],
+    [
+      -0.0016888572511851033,
+      0.0003107514452081634,
+      0.08085690654120477
+    ],
+    [
+      0.00031926328540406293,
+      -0.08081173908748031,
+      0.0003060850012397284
+    ]
+  ],
+  "F": [
+    [
+      -2.5451332630415674e-07,
+      0.00012183761812958808,
+      -0.029323435736485406
+    ],
+    [
+      -6.464567031315919e-05,
+      1.190442400972423e-05,
+      1.172811345783532
+    ],
+    [
+      0.018157663992669243,
+      -1.1889939531042675,
+      1.0
+    ]
+  ],
+  "R": [
+    [
+      0.9998289382836097,
+      0.0003722212743234883,
+      -0.018492042126073173
+    ],
+    [
+      -0.0004435342402435485,
+      0.9999924808779863,
+      -0.0038524621825493047
+    ],
+    [
+      0.018490469113769274,
+      0.0038600050276109714,
+      0.9998215855407101
+    ]
+  ],
+  "T": [
+    -0.08081245223924462,
+    -0.0002834686864379565,
+    -0.003183662006009965
+  ],
+  "chessboard": {
+    "inner_cols": 9,
+    "inner_rows": 6,
+    "square_size_m": 0.02
+  },
+  "created_utc": "2026-10-28T17:42:50.218831+00:00",
+  "image_size": [
+    640,
+    400
+  ],
+  "left": {
+    "calibrated": true,
+    "calibration": {
+      "chessboard": {
+        "inner_cols": 9,
+        "inner_rows": 6,
+        "square_size_m": 0.02
+      },
+      "rms_reprojection_px": 0.2803966450526311,
+      "views": 12
+    },
+    "camera_matrix": [
+      [
+        373.28806562353145,
+        0.0,
+        308.4063915005347
+      ],
+      [
+        0.0,
+        372.98844303187917,
+        206.66709392859508
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "created_utc": "2026-10-28T17:42:50.218831+00:00",
+    "distortion_coeffs": [
+      -0.05823554451610995,
+      -0.021884663299625698,
+      -0.0009452095429958366,
+      -0.00024440698661558276,
+      0.02454395506728113
+    ],
+    "distortion_model": "plumb_bob",
+    "image_size": [
+      640,
+      400
+    ],
+    "provenance": {
+      "metric": true,
+      "notes": "Monocular OpenCV calibrateCamera initialization followed by joint OpenCV stereoCalibrate refinement (CALIB_USE_INTRINSIC_GUESS), training pairs only. Per-eye RMS recomputed with per-view solvePnP/projectPoints using refined K/distortion; offline geometry, not hardware acceptance.",
+      "source": "chessboard_opencv_stereo_refined"
+    },
+    "schema": "psvr.camera.intrinsics",
+    "version": 1
+  },
+  "mode": "640x400",
+  "provenance": {
+    "hardware_acceptance": "unverified",
+    "physical_order_verified": false,
+    "source": "PS4_OV580",
+    "stream_labels": [
+      "left",
+      "right"
+    ],
+    "transform": "X_right = R @ X_left + T",
+    "translation_units": "metres"
+  },
+  "rectification": {
+    "P1": [
+      [
+        367.78920365401666,
+        0.0,
+        290.5653610229492,
+        0.0
+      ],
+      [
+        0.0,
+        367.78920365401666,
+        207.96151161193848,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "P2": [
+      [
+        367.78920365401666,
+        0.0,
+        290.5653610229492,
+        -29.745185752131405
+      ],
+      [
+        0.0,
+        367.78920365401666,
+        207.96151161193848,
+        0.0
+      ],
+      [
+        0.0,
+        0.0,
+        1.0,
+        0.0
+      ]
+    ],
+    "Q": [
+      [
+        1.0,
+        0.0,
+        0.0,
+        -290.5653610229492
+      ],
+      [
+        0.0,
+        1.0,
+        0.0,
+        -207.96151161193848
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        367.78920365401666
+      ],
+      [
+        0.0,
+        0.0,
+        12.364663200251238,
+        -0.0
+      ]
+    ],
+    "R1": [
+      [
+        0.9997741472880823,
+        0.004028847703721035,
+        0.020866787020719618
+      ],
+      [
+        -0.003989035315269002,
+        0.9999901440528689,
+        -0.0019492035235499383
+      ],
+      [
+        -0.02087443440290988,
+        0.0018655249403062174,
+        0.9997803647827136
+      ]
+    ],
+    "R2": [
+      [
+        0.9992187543246487,
+        0.00350499483562284,
+        0.03936490844774849
+      ],
+      [
+        -0.0035800905846414587,
+        0.9999919035115715,
+        0.0018373520918544928
+      ],
+      [
+        -0.03935814982062958,
+        -0.0019768466065776913,
+        0.9992232123605771
+      ]
+    ]
+  },
+  "right": {
+    "calibrated": true,
+    "calibration": {
+      "chessboard": {
+        "inner_cols": 9,
+        "inner_rows": 6,
+        "square_size_m": 0.02
+      },
+      "rms_reprojection_px": 0.26146657715932153,
+      "views": 12
+    },
+    "camera_matrix": [
+      [
+        371.10774021142726,
+        0.0,
+        315.1324163544515
+      ],
+      [
+        0.0,
+        370.8615275260132,
+        209.53108482641386
+      ],
+      [
+        0.0,
+        0.0,
+        1.0
+      ]
+    ],
+    "created_utc": "2026-10-28T17:42:50.218831+00:00",
+    "distortion_coeffs": [
+      -0.06491370346049176,
+      -0.013314844979367205,
+      -0.0015042073235413064,
+      0.00040712936433541687,
+      0.01866742888380676
+    ],
+    "distortion_model": "plumb_bob",
+    "image_size": [
+      640,
+      400
+    ],
+    "provenance": {
+      "metric": true,
+      "notes": "Monocular OpenCV calibrateCamera initialization followed by joint OpenCV stereoCalibrate refinement (CALIB_USE_INTRINSIC_GUESS), training pairs only. Per-eye RMS recomputed with per-view solvePnP/projectPoints using refined K/distortion; offline geometry, not hardware acceptance.",
+      "source": "chessboard_opencv_stereo_refined"
+    },
+    "schema": "psvr.camera.intrinsics",
+    "version": 1
+  },
+  "rms_reprojection_px": 0.2766493836865686,
+  "sample_count": 12,
+  "schema": "psvr.camera.stereo_intrinsics",
+  "training_fingerprints": [
+    "cc5d86c6c4add66ebc63fdc01656935df46594551ca58bae6c6609bac194ca18",
+    "5b858985e7f5ceaddb59aad1e7ebbddac64b1a971f253f2d5db3a9efc8abe666",
+    "90c8699b51d73512dca80cefde4434a487ae76773d6811a9abcea0bbd1455840",
+    "63c4218ff428c08a77c68ea469cf5eb700cd4d99dd2b24a98688941e4ba1ebd2",
+    "f1fcd50e40bd9e00ddcf72b24b1203f8f312504d5421483a3acf1ac7cc77cd11",
+    "092bbafcb524817657fa73ff87a50ff7d0bb8d08b7dbc322b8f667332bf03078",
+    "cc22a4925f7501dc7826b76683acff375971e158c893173a2056a0c69c79210a",
+    "b6d3d8f88f404018502e69286b0ed94bb9834af13f3b7ae456ef1470158102a5",
+    "1a29f61ae5adf22ef770d1e9f2abd43a9b54d60296c0593c30e5cd05e14b8e3f",
+    "6d12bc9b28cf61430203e3d4ab0c076947517762643d10afd1b9277441930f79",
+    "91134f01e05e26e0eb5dee54193f0535aa224b597e363655bc3bbfc3fe105d76",
+    "7a2ca58e45b86481deb9720387b2be6f876477eb73021c0ced2fd1c12b3d19d7"
+  ],
+  "validation": {
+    "accepted": true,
+    "epipolar_rms_px": 0.06149554780286351,
+    "max_epipolar_px": 1.0,
+    "max_reprojection_px": 1.5,
+    "max_view_epipolar_px": 0.06711444286017096,
+    "max_view_rms_px": 0.3033441079322949,
+    "per_view_epipolar_px": [
+      0.05280792670757688,
+      0.06711444286017096,
+      0.06365596307604536
+    ],
+    "per_view_rms_px": [
+      0.3033441079322949,
+      0.24365495025029402,
+      0.2841854526966189
+    ],
+    "rms_reprojection_px": 0.2781766549773095,
+    "sample_count": 3
+  },
+  "version": 1
+}

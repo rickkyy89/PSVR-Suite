@@ -91,6 +91,8 @@ int main() {
         for (int i = 0; i < 1200; ++i) { tilted.update(sample(tick,{},fixed_accel)); tick += 500; }
         check(tilted.state() == ImuState::tracking,"tilted calibration failed");
         near(rotation_distance(tilted.orientation(),{}),0,1e-8,"tilted neutral not identity");
+        near(rotation_distance(tilted.sensor_orientation(),mount),0,0.002,"optical sensor orientation must retain physical neutral tilt");
+        const auto sensor_neutral = tilted.sensor_orientation();
         for (int i = 0; i < 2000; ++i) {
             truth = (rotation_vector({0,-.63*.0005,0})*truth).normalized();
             tilted.update(sample(tick,truth.conjugate().rotate({0,-.63,0}),truth.conjugate().rotate({0,9.81,0})));
@@ -100,6 +102,9 @@ int main() {
         near(yaw_tilted.yaw,-.63*degrees,.08,"tilted neutral world yaw wrong");
         near(yaw_tilted.pitch,0,.08,"world yaw coupled into pitch");
         near(yaw_tilted.roll,0,.08,"world yaw coupled into roll");
+        near(rotation_distance(tilted.sensor_orientation(),truth),0,.08,"physical sensor basis must follow rigid-body rotation");
+        near(rotation_distance(tilted.sensor_orientation(),tilted.orientation()*sensor_neutral),0,1e-6,
+             "sensor quaternion must be separable from neutral head offset");
         tilted.recenter();
         near(rotation_distance(tilted.orientation(),{}),0,1e-8,"repeated full recenter failed");
         tilted.restart_calibration();

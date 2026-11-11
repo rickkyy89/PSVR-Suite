@@ -1,0 +1,13 @@
+{
+  "filter": "kalman",
+  "kalman": {
+    "acceleration_std_m_s2": 3.0,
+    "gate_chi2": 16.27,
+    "max_prediction_s": 0.08,
+    "max_gap_s": 0.25,
+    "max_speed_m_s": 2.0,
+    "max_position_std_m": 0.08,
+    "reliable_std_m": 0.04,
+    "recovery_confirmations": 4
+  }
+}

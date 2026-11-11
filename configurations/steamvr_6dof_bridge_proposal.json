@@ -1,0 +1,12 @@
+{
+  "driver_psvrpc": {
+    "imuExportEnabled": true,
+    "imuExportPort": 4272,
+    "imuExportHz": 100,
+    "positionEnabled": true,
+    "positionPort": 4271,
+    "positionTimeoutMs": 200,
+    "positionGraceMs": 80,
+    "positionMaxAbsM": 10.0
+  }
+}

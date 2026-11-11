@@ -1,0 +1,3 @@
+# Local camera virtualenv only; tests do not require camera/SteamVR hardware.
+-r requirements-optional.txt
+pytest>=8.0

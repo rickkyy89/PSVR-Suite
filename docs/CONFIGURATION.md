@@ -33,3 +33,48 @@ positional gain, smoothing, deadzone, stale timeout).
 
 Non inserire valori ottici arbitrari in un file che il driver ancora non usa.
 Non confondere impostazioni configurate con refresh/coordinate misurati.
+
+## Preferenze della suite e consumatori
+
+Le preferenze della suite sono uno schema distinto dal JSON diagnostico.
+Al caricamento iniziale la precedenza è `--preferences` > file utente >
+impostazioni driver > default suite. Un file utente malformato produce una
+nota e il tentativo di lettura del driver; se anche questo è indisponibile
+si usano i default. La lettura non riscrive i file.
+
+- **FPS camera:** intero positivo per salvataggio, UI e worker. `75.0` viene
+  rappresentato esattamente come `75`; `74.5` viene rifiutato prima del
+  salvataggio, senza arrotondamenti.
+- **`tracking_config_path`:** file passato come `--config` a `psvr_diag`
+  per i comandi di avvio VR (`--vr-mode`, `--leds-on`) e ritorno cinema.
+  I percorsi relativi sono risolti rispetto alla root della suite, gli assoluti
+  restano assoluti, anche con spazi. Il default è `config.json`. Un percorso
+  esplicito non valido non viene sostituito con la baseline. La UI acquisisce
+  il percorso al click dell'azione. Il campo non configura il worker camera
+  né il driver OpenVR: quest'ultimo legge le chiavi `imu*` da
+  `steamvr.vrsettings`, applicate separatamente dalla suite.
+- **Gap IMU per destinazione:** suite e driver ammettono `1000..50000 us`;
+  `psvr_diag` ammette `1000..20000 us`. `derive_imu_config` rifiuta valori
+  oltre 20000 prima di creare il derivato, con errore esplicito e senza clamp.
+  I tre override di timing del derivato sono `calibration_ms` (500..10000),
+  `stale_timeout_ms` (20..1000) e `max_sample_gap_us` (1000..20000).
+  La baseline globale resta di sola lettura e un derivato esistente non viene
+  sovrascritto. Cambiare le preferenze non riscrive automaticamente un derivato.
+- **Importazione driver:** `positionEnabled` assente o `false` significa
+  `3dof`; soltanto `true` significa `6dof`, come nel driver nativo.
+  Un valore presente di tipo diverso da bool viene rifiutato. I default di
+  una nuova configurazione suite mantengono invece `tracking_mode=6dof`:
+  creazione di preferenze e ricostruzione del driver sono operazioni distinte.
+
+Regressioni offline: `tests/test_suite_settings_consumers.py` e callback UI
+in `tests/test_suite_app_model.py`. Il test CTest `suite_config_native_interop`
+verifica export Python → parser C++ reale ai limiti del contratto, senza USB:
+
+```powershell
+cmake --preset vs2022
+cmake --build build/vs2022 --config Release --target psvr_suite_config_fixture
+ctest --test-dir build/vs2022 -C Release -R suite_config_native_interop --output-on-failure
+```
+
+In alternativa, dopo aver compilato la fixture, eseguire
+`python tests/check_suite_config.py <percorso-psvr_suite_config_fixture.exe>`.

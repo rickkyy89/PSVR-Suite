@@ -1,0 +1,85 @@
+{
+  "experimental": true,
+  "hardware_accepted": false,
+  "input_provenance": {
+    "legacy_reconstructed_inputs": 62283
+  },
+  "metrics": {
+    "kalman": {
+      "camera_depth_detrended_std_m": 0.15881724266000838,
+      "camera_depth_drift_m_s": -0.00024488579055267164,
+      "camera_depth_std_m": 0.16580107812280162,
+      "depth_drift_m_s": -0.0002490194745277194,
+      "detrended_xyz_std_m": [
+        0.06785917810505872,
+        0.06391340772254016,
+        0.16400633377210017
+      ],
+      "estimated_velocity_max_m_s": 1.188853350122987,
+      "frames": 62283,
+      "jitter_interpretation": "whole-trial dispersion; NOT stationary jitter",
+      "predicted_frames": 826,
+      "predicted_step_max_m": 0.014684220424982674,
+      "quality_rejections": {
+        "excessive_uncertainty": 58,
+        "insufficient_leds": 764,
+        "legacy_missing_geometry": 15659
+      },
+      "reacquisition_jump_max_m": 0.8649235787958403,
+      "reacquisitions": 84,
+      "rejected_measurements": 344,
+      "response_delay_s": null,
+      "speed_max_m_s": 1.9923421323528407,
+      "step_max_m": 0.02788163273383035,
+      "step_p95_m": 0.005027684604473462,
+      "step_p99_m": 0.009684489774991582,
+      "valid_frames": 44807,
+      "xyz_std_m": [
+        0.07325735702732263,
+        0.0640343026521003,
+        0.17100392189235236
+      ]
+    },
+    "one_euro": {
+      "camera_depth_detrended_std_m": 0.15832616282628417,
+      "camera_depth_drift_m_s": -0.0002490228620913067,
+      "camera_depth_std_m": 0.16546577959086545,
+      "depth_drift_m_s": -0.00025511544028814404,
+      "detrended_xyz_std_m": [
+        0.06762525272723917,
+        0.06600736573196607,
+        0.1637665578681615
+      ],
+      "estimated_velocity_max_m_s": null,
+      "frames": 62283,
+      "jitter_interpretation": "whole-trial dispersion; NOT stationary jitter",
+      "predicted_frames": 0,
+      "predicted_step_max_m": null,
+      "quality_rejections": {
+        "excessive_uncertainty": 58,
+        "insufficient_leds": 764,
+        "legacy_missing_geometry": 15659
+      },
+      "reacquisition_jump_max_m": 0.8795768136274207,
+      "reacquisitions": 516,
+      "rejected_measurements": 0,
+      "response_delay_s": null,
+      "speed_max_m_s": 2.8113656780826695,
+      "step_max_m": 0.03439335342387406,
+      "step_p95_m": 0.005112237316834443,
+      "step_p99_m": 0.01141250365040357,
+      "valid_frames": 46624,
+      "xyz_std_m": [
+        0.07273625483934568,
+        0.06610097811538562,
+        0.1710138529981278
+      ]
+    }
+  },
+  "recorded_baseline_comparison": {
+    "compared_frames": 46624,
+    "max_difference_m": 0.0034118277466521343
+  },
+  "schema": "psvr.position.filter_comparison",
+  "timestamp_policy": "original capture timestamps, shared inputs; no resampling"
+}

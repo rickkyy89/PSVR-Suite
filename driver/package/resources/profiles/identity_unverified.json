@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "name": "Diagnostic identity unverified - NOT optical calibration",
+  "uv_convention": "eye-local-top-left",
+  "mapping": "display-to-render",
+  "eyes": {
+    "left": {
+      "center": [0.5, 0.5],
+      "axis_scale": [1, 1],
+      "polynomial": {"a": 0, "b": 0, "c": 0, "d": 1},
+      "rgb_scale": {"red": 1, "green": 1, "blue": 1}
+    },
+    "right": {
+      "center": [0.5, 0.5],
+      "axis_scale": [1, 1],
+      "polynomial": {"a": 0, "b": 0, "c": 0, "d": 1},
+      "rgb_scale": {"red": 1, "green": 1, "blue": 1}
+    }
+  }
+}

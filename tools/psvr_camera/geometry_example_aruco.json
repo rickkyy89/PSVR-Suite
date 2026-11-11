@@ -1,0 +1,18 @@
+{
+  "schema": "psvr.camera.marker_geometry",
+  "version": 1,
+  "kind": "aruco",
+  "provenance": "user_measured",
+  "description": "EXAMPLE ONLY. Print an ArUco DICT_4X4_50 marker id 0 and MEASURE its black square side with calipers; replace marker_length_m with that measurement before tracking.",
+  "marker_length_m": 0.1,
+  "aruco": {
+    "dictionary": "DICT_4X4_50",
+    "id": 0
+  },
+  "object_points_m": [
+    [-0.05, 0.05, 0.0],
+    [0.05, 0.05, 0.0],
+    [0.05, -0.05, 0.0],
+    [-0.05, -0.05, 0.0]
+  ]
+}

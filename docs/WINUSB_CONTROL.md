@@ -41,3 +41,21 @@ oem*.inf WinUSB prima della rimozione. Questa operazione è manuale.
 Il binario M1 al commit e3ce22e richiede HID su 4/5; il diagnostico M2 mantiene
 la lettura passiva dei sensori anche con controllo WinUSB. Per tornare al vecchio
 binario M1 ripristinare MI_05 a HID.
+
+## Contratto delle azioni e selezione (aggiornamento 2026-10-15)
+
+- `--enumerate-only` completa i metadati PnP/HID anche con più processor unit:
+  exit 0 se PSVR presente, 2 se assente. Non acquisisce ownership e non apre
+  interfacce operative; gli errori di enumerazione restano errori.
+- Capture passiva e IMU richiedono il sensore MI_04 HID e il controllo MI_05.
+- Le azioni M2 (`--control-info`, `--status`, power, mode, LED) richiedono una
+  MI_05 WinUSB sana e non ambigua, ma non la presenza del sensore MI_04.
+  Non aprono né leggono il sensore; questo consente di diagnosticare il
+  controllo anche con binding del sensore assente/non disponibile.
+- Restano rifiutati più composite PSVR, più MI_05 PnP o interfacce HID
+  duplicate: exit 3 prima di ownership/open/write. L'indipendenza da MI_04
+  non autorizza la selezione arbitraria di una processor unit.
+- `--control-info` legge soltanto i descriptor; `--status` osserva USB IN,
+  senza query. Le scritture restano limitate alla whitelist esplicita, una
+  sola volta; power/mode richiedono ACK A0 corretto e F0 post-write coerente.
+  Per i LED l'ACK conferma accettazione, non luminosità misurata.

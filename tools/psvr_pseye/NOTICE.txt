@@ -1,0 +1,52 @@
+psvr_pseye - third-party notices and source provenance
+======================================================
+
+This directory (the "stage") contains three binaries and the licences that
+cover them. Shipping them together is a combined distribution. In particular,
+psvr_pseye.dll loads ps3eye.dll at run time, so the GPLv2 obligations that
+cover ps3eye.dll apply to this distribution; dynamic loading does not remove
+them.
+
+  psvr_pseye.dll   MIT (this repository)
+  ps3eye.dll       MIT (new code) + GPLv2 (ov534 register tables)
+  libusb-1.0.dll   LGPL-2.1-or-later
+
+psvr_pseye.dll
+--------------
+Source: this repository (tools/psvr_pseye). Licence: MIT. Full text staged as
+psvr_pseye-MIT.txt. The shim contains no third-party code; it resolves the
+ps3eye.dll C API with GetProcAddress.
+
+ps3eye.dll
+----------
+Source: https://github.com/inspirit/PS3EYEDriver at commit
+  fe03494e648d0bf2aaa77869e5b50965e2e23620
+plus the in-repository patch series
+  patches/0001-bounded-grab-and-actual-fps.patch
+  patches/0002-transfer-fault-lifetime.patch
+  patches/0003-refresh-idle-inventory.patch
+which adds bounded grab/abort/actual frame rate, fault-safe transfer teardown,
+idle inventory refresh and a pre-init patch-level handshake.
+
+Licence: MIT for newly written code and GPLv2 for the OV534 register tables
+ported from the Linux kernel gspca ov534 driver. The upstream licence statement
+is staged as PS3EYEDriver-LICENSE.txt; the complete GNU General Public License
+version 2 text is staged as COPYING.GPL-2.0.
+
+The complete corresponding source for the built ps3eye.dll is the pinned
+upstream commit above plus the in-repository patches, all of which are available
+from the same place as this distribution.
+
+libusb-1.0.dll
+--------------
+Source: https://github.com/libusb/libusb at commit
+  d52e355daa09f17ce64819122cb067b8a2ee0d4b
+Licence: LGPL-2.1-or-later. Full text staged as COPYING.LGPL-2.1.
+With build.ps1 -BuildLibusb, this source pin is built with
+  patches/libusb-0001-control-overlapped-length.patch
+(also staged next to the DLL). This fixes the libusb0/libusbK overlapped
+control result length and bounds synchronous control copies. The complete
+corresponding source is that pin plus this patch; build_libusb.ps1 reproduces it.
+Legacy explicit external DLL builds use their supplied runtime as-is; its
+actual source/version must be recorded separately. No kernel driver is bundled
+or installed by either build path.

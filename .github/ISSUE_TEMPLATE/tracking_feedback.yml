@@ -1,0 +1,38 @@
+name: Tracking feedback
+description: In-headset motion/visual feedback (One Euro vs Kalman, optics, -202)
+title: "[feedback] "
+labels: ["feedback"]
+body:
+  - type: input
+    id: session
+    attributes:
+      label: Session / game
+      placeholder: "MSFS 2024 18:21-18:32, SteamVR Home, Assetto Corsa ..."
+    validations:
+      required: true
+  - type: input
+    id: config
+    attributes:
+      label: Config in use
+      placeholder: "filter, fallback on/off, optics profile, H/V FOV"
+    validations:
+      required: true
+  - type: textarea
+    id: felt
+    attributes:
+      label: What you felt (continuity, jumps, stretch, comfort)
+      description: Verbatim impression first, interpretation second.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Log refs (bounded, paths only + short excerpt)
+      placeholder: "logs/msfs2024_tracking_review_20261014.json, vrserver.txt offset ..."
+  - type: checkboxes
+    id: note
+    attributes:
+      label: Notes
+      options:
+        - label: I did not change fallback/optics mid-session unless stated
+        - label: No 90 fps / calibration claim inferred from this session

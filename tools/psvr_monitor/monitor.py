@@ -1179,6 +1179,15 @@ def main(argv=None):
     parser.add_argument("--imu-duration-ms", type=int, default=0, help="0 = indefinito; durata massima 180000 ms")
     parser.add_argument("--stationary-test", action="store_true", help="Test statico: --start-imu e durata >= config calibrazione + startup + 30000 ms misura + 1000 ms margine (default 39200)")
     args = parser.parse_args(argv)
+    args.root = args.root.resolve()
+    if not args.root.is_dir():
+        parser.error(f"--root non valido: directory inesistente: {args.root}")
+    if not (args.root / "out" / "diag" / "psvr_diag.exe").is_file():
+        print(f"PSVR monitor: avviso: backend nativo assente: "
+              f"{args.root / 'out' / 'diag' / 'psvr_diag.exe'}", file=sys.stderr)
+    if not (args.root / "config.json").is_file():
+        print(f"PSVR monitor: avviso: config assente: "
+              f"{args.root / 'config.json'}", file=sys.stderr)
     try:
         validate_imu_options(args.imu_duration_ms, args.stationary_test, args.root)
     except ValueError as exc:

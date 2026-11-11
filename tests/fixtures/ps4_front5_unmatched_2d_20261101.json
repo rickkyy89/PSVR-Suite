@@ -1,0 +1,33 @@
+{
+  "schema": "psvr.test.ps4.recorded_centroids",
+  "version": 1,
+  "recording": "temp/opencode/ps4-sweep-brightness0-gain1-exposure--7-raw.png",
+  "recording_png_sha256": "72e11993b8da7aa203af57bcc31dcc8d12b0f604b3fb8449cb52eeab101a5c26",
+  "calibration_sha256": "b7c937f920295cd8b2569059210be51b15adc2c1184fb7c80bb004797c072cee",
+  "eye_order": ["right", "left"],
+  "image_size": [640, 400],
+  "controls": {"exposure": -7, "gain": 1, "brightness": 0},
+  "detector": {"value_min": 160, "saturation_min": 90, "min_area": 20, "include_white_cores": true},
+  "left": [
+    {"center_px": [360.5, 163.0], "area_px": 30, "bbox_px": [358,161,6,5]},
+    {"center_px": [279.0751879699248,185.0751879699248], "area_px": 133, "bbox_px": [272,180,15,12]},
+    {"center_px": [350.61176470588236,186.38823529411764], "area_px": 170, "bbox_px": [341,180,20,13]},
+    {"center_px": [586.2008032128514,205.89156626506025], "area_px": 249, "bbox_px": [566,200,38,12]},
+    {"center_px": [313.3267326732673,212.11881188118812], "area_px": 101, "bbox_px": [304,209,19,7]},
+    {"center_px": [282.45454545454544,228.22727272727272], "area_px": 22, "bbox_px": [278,226,9,5]},
+    {"center_px": [348.475,229.65], "area_px": 40, "bbox_px": [342,226,15,7]}
+  ],
+  "right": [
+    {"center_px": [324.8,163.4], "area_px": 20, "bbox_px": [323,161,5,5]},
+    {"center_px": [238.0,185.81927710843374], "area_px": 83, "bbox_px": [233,181,12,11]},
+    {"center_px": [309.3939393939394,187.6], "area_px": 165, "bbox_px": [301,182,19,13]},
+    {"center_px": [556.9487179487179,192.43589743589743], "area_px": 39, "bbox_px": [554,190,7,6]},
+    {"center_px": [583.5,199.0], "area_px": 30, "bbox_px": [581,197,6,5]},
+    {"center_px": [579.7916666666666,208.58333333333334], "area_px": 24, "bbox_px": [572,205,16,7]},
+    {"center_px": [272.02,213.35], "area_px": 100, "bbox_px": [264,210,18,8]},
+    {"center_px": [243.75,229.83333333333334], "area_px": 24, "bbox_px": [240,228,8,5]},
+    {"center_px": [308.9024390243902,230.4390243902439], "area_px": 41, "bbox_px": [304,228,12,7]}
+  ],
+  "expected_match_indices": [[1,1],[2,2],[4,6],[5,7],[6,8]],
+  "expected_stereo_rms_px": 0.7433689879866398
+}

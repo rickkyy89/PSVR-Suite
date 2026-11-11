@@ -36,6 +36,50 @@ int main() {
         check(packet->samples[0].accel[0] == 0x1234 && packet->samples[1].accel[0] == -16384, "sample/accel layout wrong");
         check(packet->sequence == 0xa5, "sequence wrong");
         check(packet->worn() && packet->status_raw == 0x91 && packet->ir_raw == 1023,"sensor presence/raw IR offsets wrong");
+        // MI_04 headset input (read-only): byte0 buttons, byte2 volume, byte8 flags.
+        // Untouched fixture above has no buttons pressed: defaults must be neutral.
+        check(packet->buttons_raw == 0 && packet->volume_raw == 0, "default input bytes not zero");
+        check(packet->headset_flags_raw == 0x91, "headset flags must mirror byte8");
+        check(!packet->volume_up() && !packet->volume_down() && !packet->mic_mute_pressed(), "phantom button press");
+        check(!packet->mic_muted() && packet->headphones_present(), "byte8 bit3/bit4 helpers wrong for 0x91");
+        // Synthetic frames: each button bit in isolation, then combined.
+        for (const auto bit : {0x02, 0x04, 0x08}) {
+            auto frame = bytes;
+            frame[0] = static_cast<unsigned char>(bit);
+            const auto pressed = psvr::decode_sensor(frame.data(), frame.size());
+            check(pressed.has_value(), "button frame rejected");
+            check(pressed->volume_up() == (bit == 0x02), "volume_up bitmask wrong");
+            check(pressed->volume_down() == (bit == 0x04), "volume_down bitmask wrong");
+            check(pressed->mic_mute_pressed() == (bit == 0x08), "mic_mute bitmask wrong");
+        }
+        {
+            auto frame = bytes;
+            frame[0] = 0x0e; frame[2] = 0x2a; frame[8] = 0x19;
+            const auto pressed = psvr::decode_sensor(frame.data(), frame.size());
+            check(pressed.has_value(), "combined input frame rejected");
+            check(pressed->buttons_raw == 0x0e && pressed->volume_raw == 0x2a, "input raw bytes wrong");
+            check(pressed->headset_flags_raw == 0x19 && pressed->status_raw == 0x19, "flags/status raw diverged");
+            check(pressed->volume_up() && pressed->volume_down() && pressed->mic_mute_pressed(), "combined buttons wrong");
+            check(pressed->worn() && pressed->mic_muted() && pressed->headphones_present(), "combined byte8 flags wrong");
+            frame[8] = 0x00;
+            const auto bare = psvr::decode_sensor(frame.data(), frame.size());
+            check(bare && !bare->worn() && !bare->mic_muted() && !bare->headphones_present(), "cleared byte8 still flagged");
+        }
+        // IMU regression: identical IMU/seq/IR bytes with input bytes set must
+        // decode to identical samples/sequence/IR (offsets untouched).
+        {
+            auto frame = bytes;
+            frame[0] = 0x0e; frame[2] = 0x2a;
+            const auto with_input = psvr::decode_sensor(frame.data(), frame.size());
+            check(with_input.has_value(), "regression frame rejected");
+            for (std::size_t s = 0; s < 2; ++s) {
+                check(with_input->samples[s].tick == packet->samples[s].tick, "tick offset shifted by input bytes");
+                for (std::size_t a = 0; a < 3; ++a)
+                    check(with_input->samples[s].gyro[a] == packet->samples[s].gyro[a] &&
+                        with_input->samples[s].accel[a] == packet->samples[s].accel[a], "IMU axis offset shifted by input bytes");
+            }
+            check(with_input->sequence == packet->sequence && with_input->ir_raw == packet->ir_raw, "seq/IR offset shifted by input bytes");
+        }
         for (const auto size : {0u, 1u, 63u, 65u, 512u})
             check(!psvr::decode_sensor(bytes.data(), size), "malformed packet accepted");
         check(!psvr::decode_sensor(nullptr, 64), "null packet accepted");
@@ -58,14 +102,20 @@ int main() {
         rejects([&] { psvr::config_options(j); }, "unknown config accepted");
         rejects([] { psvr::bounded_integer("100ms", 100, 60000); }, "CLI junk accepted");
         rejects([] { psvr::bounded_integer("-100", 100, 60000); }, "CLI negative accepted");
-        const std::array<unsigned char, 8> power_on{{0x17, 0, 0xaa, 4, 1, 0, 0, 0}};
-        const std::array<unsigned char, 8> power_off{{0x17, 0, 0xaa, 4, 0, 0, 0, 0}};
-        const std::array<unsigned char, 8> vr{{0x23, 0, 0xaa, 4, 1, 0, 0, 0}};
-        const std::array<unsigned char, 8> cinema{{0x23, 0, 0xaa, 4, 0, 0, 0, 0}};
+        const std::vector<unsigned char> power_on{0x17, 0, 0xaa, 4, 1, 0, 0, 0};
+        const std::vector<unsigned char> power_off{0x17, 0, 0xaa, 4, 0, 0, 0, 0};
+        const std::vector<unsigned char> vr{0x23, 0, 0xaa, 4, 1, 0, 0, 0};
+        const std::vector<unsigned char> cinema{0x23, 0, 0xaa, 4, 0, 0, 0, 0};
         check(psvr::command_packet(psvr::Action::power_on) == power_on, "wrong power-on wire packet");
         check(psvr::command_packet(psvr::Action::power_off) == power_off, "wrong power-off wire packet");
         check(psvr::command_packet(psvr::Action::vr_mode) == vr, "wrong VR wire packet");
         check(psvr::command_packet(psvr::Action::cinema_mode) == cinema, "wrong cinema wire packet");
+        const std::vector<unsigned char> leds{0x15, 0, 0xaa, 16, 0xff, 1,
+            100, 100, 100, 100, 100, 100, 100, 100, 100, 0, 0, 0, 0, 0};
+        check(psvr::command_packet(psvr::Action::leds_on) == leds, "wrong LED mask/intensity/reserved bytes");
+        check(psvr::parse_action("--leds-on") == psvr::Action::leds_on, "LED action not parsed");
+        check(!psvr::status_matches(psvr::Action::leds_on, psvr::ControlStatus{1,1}),
+              "F0 cannot verify LED brightness");
         rejects([] { psvr::command_packet(psvr::Action::status); }, "status action produces write");
         rejects([] { psvr::command_packet(static_cast<psvr::Action>(999)); }, "unknown action produces write");
         std::array<unsigned char, 64> f0{};

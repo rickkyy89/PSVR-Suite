@@ -1,5 +1,10 @@
 # Monitor PSVR
 
+Aggiornamento 2026-10-04: assi post-fix, confronto guidato presenza e
+scollegamento/ripartenza sono stati verificati; vedere
+[verifiche fisiche](M3_PHYSICAL_CHECKS_20261004.md) per evidenze e gate residui.
+I risultati e le prove pendenti riportati sotto descrivono la sessione precedente.
+
 `tools/psvr_monitor/monitor.py` è una GUI diagnostica Python 3.11/Tkinter
 standard per osservare telemetria IMU e stato del PSVR durante le prove. Avvio
 dalla root:

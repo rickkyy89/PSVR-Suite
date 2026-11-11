@@ -331,3 +331,69 @@ Monitor `tools/psvr_monitor/monitor.py` Py3.11 Tk8.6, un NativeWorker, API
 readonly loopback effimera via `logs/monitor_api.json`. Assi RHand +X/+Y/−Z,
 segni yaw−/pitch+/roll−; grafici Y rosso, X verde, Z blu.
 M4 non iniziata; stereo/display/SteamVR non dichiarati.
+
+## 12. Evoluzione M4 software (2026-10-04)
+
+Su istruzione dell'utente, prove fisiche residue rinviate e implementazione
+M4 eseguita senza accesso hardware/runtime. Driver OpenVR HMD-only originale,
+SDK 2.15.6 fissato, thread HID MI_04/fusion M3, snapshot e adapter pose,
+factory/provider, package e script di registrazione/log. Build x64 e 18/18
+CTest PASS; driver disabilitato per default, non registrato. Display component
+non implementata: M4 resta IN_PROGRESS fino al riconoscimento runtime HMD/pose;
+M5 non iniziata. [Report M4](docs/MILESTONE_4_REPORT.md).
+
+## 13. Evoluzione autonoma M5 / fondazione M6 (2026-10-04)
+
+Inventario display read-only Windows (QueryDisplayConfig/device-info/modi GDI),
+componente OpenVR `_003` extended-desktop opt-in e selezione percorso monitor
+esatto/geometria/refresh verificati contro snapshot. Controllo topologia su
+thread separato, invalidazione latched e RequestRestart SDK; mai fallback
+automatico primary/EDID. Modulo distortion pure math forward/inverse e
+monotonicità analitica, non ancora applicato a rendering ottico.
+Build x64 24/24 CTest PASS; nessuna enumerazione live, registrazione SteamVR,
+Activate USB, presentazione sul pannello o accettazione ottica effettuata
+dalla sessione autonoma. Gate fisici/runtime rinviati su richiesta utente:
+[M5](docs/MILESTONE_5_REPORT.md), [M6](docs/MILESTONE_6_SOFTWARE.md),
+[coda manuale](docs/MANUAL_VALIDATION_QUEUE.md).
+
+## 14. Integrazione autonoma M6 (2026-10-04)
+
+Loader profili JSON schema v1 display-to-render, bounded/strict e snapshot
+immutable; adapter RGB forward/inverse nel componente OpenVR con opt-in
+esplicito, nessun fallback identity su errore profilo. Policy SDK float
+separata da math e inversa uncertainty-aware soltanto al boundary SDK.
+Validatore offline Windows Unicode `out/optics/psvr_optics.exe`, pattern SVG
+stereo `out/patterns/`, risorse driver aggiornate. Build x64 28/28 CTest PASS.
+Profili calibrati/ottica/runtime ancora non accettati, test manuali rinviati.
+[Report M6](docs/MILESTONE_6_SOFTWARE.md).
+
+## 15. Evoluzione M9 / PSEye (2026-10-05)
+
+La sessione autonoma aggiunge la PS3 Eye come sorgente video USB dedicata,
+con binding libusb-win32 già esistente distinto dalle interfacce PSVR.
+Acquisizione reale verificata a 640×480/60–75 e 320×240/187; sorgenti fissati,
+patch bounded-grab e licenze in package camera separato.
+
+Il piano OpenTrack/AITrack del §6 è sostituito inizialmente da un protocollo
+JSON metrico esplicito `psvr.position` v1 su loopback 4271. Posizione opt-in,
+orientamento IMU, origine seduta/epoca e rotazione recenter condivise; tracking
+perso rende la posa invalida. Camera: intrinseci misurati e bersaglio rigido
+ArUco, con rifiuto ambiguità/reproiezione/range/discrepanze di risoluzione.
+Geometria LED PSVR, extrinseci, lever arm e latenza restano da misurare.
+**35/35 CTest PASS**, M9 IN_PROGRESS. Nessuna certificazione room-scale.
+[Report sessione](docs/AUTONOMOUS_20261005.md),
+[protocollo e driver](docs/MILESTONE_9_SOFTWARE.md).
+
+## 16. Estimatore di posizione selezionabile (2026-10-13)
+
+Il tracking LED trasforma il punto HEAD nel frame IMU non-recentered prima della
+selezione esclusiva One Euro/Kalman e dell'invio v2. Il Kalman esistente mantiene
+stato CV 6D, Q da dt reale, R PnP e gating; le ottimizzazioni opt-in aggiungono
+Q quasi-statica/onset, inflazione PSD lungo `A.T@[0,0,1]` e recovery GLS correlato.
+Orientamento IMU e pipeline ottica restano indipendenti e invariati.
+
+`prediction_output=driver_hold` separa validità interna e wire: predizioni interne
+non rinnovano il last-good driver, evitando di sommare il loro budget al grace.
+Protocollo/binding/timestamp restano quelli esistenti. Baseline originale numerica
+conservata; logging/replay distinguono misura, predizione e discontinuità invalida.
+[Report quantitativo e compromessi](docs/KALMAN_OPTIMIZATION_20261013.md).

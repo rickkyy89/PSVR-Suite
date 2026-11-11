@@ -4,6 +4,7 @@
 #include "pnp_windows.hpp"
 #include "control_windows.hpp"
 #include "imu_capture.hpp"
+#include "device_session.hpp"
 #include <windows.h>
 #include <hidsdi.h>
 #include <hidapi.h>
@@ -79,7 +80,7 @@ void help() {
         "                 [--read-timeout-ms 1..1000] [--raw-packets 0..100]\n"
         "                 [--log-dir directory] [--enumerate-only] [--all-devices]\n"
         "                 [--control-info | --status | --power-on | --power-off |\n"
-        "                  --vr-mode | --cinema-mode] [--control-timeout-ms 100..15000]\n"
+        "                  --vr-mode | --cinema-mode | --leds-on] [--control-timeout-ms 100..15000]\n"
         "                 [--dry-run (power/mode only: print bytes, never open USB)]\n"
         "                 [--imu | --stationary-test | --axis-test yaw-right/pitch-up/roll-right]\n"
         "                 [--output-interval-ms 20..5000] [--recenter-at-ms N]\n"
@@ -88,7 +89,8 @@ void help() {
         "IMU: timestamp-based fusion, mandatory stationary calibration, R=recenter, C=recalibrate.\n"
         "IMU default duration 15s, --duration-ms 0 runs until stopped; max timed 180000.\n"
         "M2 requires WinUSB on PSVR interface 5; sensors stay HID on interface 4.\n"
-        "Only power (0x17) and VR/cinema (0x23) writes are supported; no firmware commands.\n"
+        "M2 actions do not require/open sensor 4; passive/IMU capture requires it.\n"
+        "Writes: power (0x17), VR/cinema (0x23), all LEDs at 100% (0x15); no firmware commands.\n"
         "Config is explicit; CLI options override it regardless of argument order.\n"
         "Exit: 0=PASS, 1=usage/config/internal, 2=absent, 3=interface/I/O,\n"
         "      4=no valid sensor report, 5=WinUSB control driver needed,\n"
@@ -209,7 +211,9 @@ int control_action(psvr::WinUsbControl& control, const psvr::Options& options, L
         log.write("INFO", std::string("command requested action=") + psvr::action_name(options.action) +
             " full_usb_packet=" + hex_bytes(packet.data(), static_cast<int>(packet.size())));
         const auto sent = control.send(options.action, 1000);
-        log.write("INFO", "command transfer OK bytes=" + std::to_string(sent) + " state_verified=false (waiting for fresh F0 status)");
+        log.write("INFO", "command transfer OK bytes=" + std::to_string(sent) +
+            (options.action == psvr::Action::leds_on ? " brightness_verified=false (waiting for A0 acceptance)" :
+             " state_verified=false (waiting for fresh F0 status)"));
     } else {
         log.write("INFO", "status observation started: passive USB IN, no query/write command");
     }
@@ -230,6 +234,10 @@ int control_action(psvr::WinUsbControl& control, const psvr::Options& options, L
                         std::to_string(response->result_code) + " (0=accepted; not a display-state verification)");
                     if (response->result_code) return 3;
                     acknowledged = true;
+                    if (options.action == psvr::Action::leds_on) {
+                        log.write("INFO", "LED command accepted; F0 has no LED brightness readback. Verify visually or with camera.");
+                        return 0;
+                    }
                 }
             }
         }
@@ -299,6 +307,7 @@ int capture(hid_device* sensor, hid_device* control, bool control_supports_input
     unsigned int previous_sequence = 0;
     bool have_sequence = false;
     bool io_failed = false;
+    psvr::SensorPacket latest_sensor{};
     const auto start = Clock::now();
     const auto deadline = start + std::chrono::milliseconds(options.duration_ms);
     log.write("INFO", "capture started duration_ms=" + std::to_string(options.duration_ms) +
@@ -324,9 +333,13 @@ int capture(hid_device* sensor, hid_device* control, bool control_supports_input
                 }
                 previous_sequence = packet->sequence;
                 have_sequence = true;
+                latest_sensor = *packet;
                 if (valid == 1) {
                     log.write("INFO", "sensor packet OK length=64 tick0=" + std::to_string(packet->samples[0].tick) +
-                        " tick1=" + std::to_string(packet->samples[1].tick) + " seq=" + std::to_string(packet->sequence));
+                        " tick1=" + std::to_string(packet->samples[1].tick) + " seq=" + std::to_string(packet->sequence) +
+                        " buttons_raw=" + std::to_string(packet->buttons_raw) +
+                        " volume_raw=" + std::to_string(packet->volume_raw) +
+                        " headset_flags_raw=" + std::to_string(packet->headset_flags_raw));
                     if (options.verbosity == "debug")
                         log.write("DEBUG", "sensor first intra-packet tick delta (24bit)=" +
                             std::to_string((packet->samples[1].tick - packet->samples[0].tick) & 0xffffffu));
@@ -356,7 +369,10 @@ int capture(hid_device* sensor, hid_device* control, bool control_supports_input
     summary << std::fixed << std::setprecision(2) << "sensor summary reports=" << reports
         << " valid64=" << valid << " rejected=" << invalid << " sequence_discontinuities=" << sequence_gaps
         << " elapsed_s=" << seconds << " report_hz=" << reports / seconds
-        << " samples_hz_estimate=" << (2 * valid) / seconds;
+        << " samples_hz_estimate=" << (2 * valid) / seconds
+        << " buttons_raw_last=" << unsigned(latest_sensor.buttons_raw)
+        << " volume_raw_last=" << unsigned(latest_sensor.volume_raw)
+        << " headset_flags_raw_last=" << unsigned(latest_sensor.headset_flags_raw);
     log.write("INFO", summary.str());
     log.write("INFO", "control summary reports=" + std::to_string(control_reports) +
         (control_supports_input ? " (passive timeout is allowed)" : " (input not consumed during sensor-only capture)"));
@@ -375,13 +391,13 @@ int diagnose(const psvr::Options& options, Logger& log) {
     log.write("INFO", std::string("psvr_diag 0.3.0 x64 HIDAPI=") + hid_version_str() + " action=" + (options.imu ? "imu" : psvr::action_name(options.action)));
     log.write("INFO", "USB detection started");
     const auto usb = psvr::enumerate_usb();
-    unsigned int matches = 0, composite_devices = 0;
+    unsigned int matches = 0, composite_devices = 0, control_nodes = 0;
     const psvr::PnpDevice* control_pnp = nullptr;
     for (const auto& device : usb) {
         if (device.is_psvr) ++matches;
         if (device.is_composite) ++composite_devices;
         if (device.is_psvr && device.instance_id.find("&MI_05\\") != std::string::npos) {
-            if (control_pnp) throw std::runtime_error("ambiguous MI_05 PnP nodes");
+            ++control_nodes;
             control_pnp = &device;
         }
         if (device.is_psvr || options.all_devices) {
@@ -436,14 +452,19 @@ int diagnose(const psvr::Options& options, Logger& log) {
         return 0;
     }
     const auto selection = psvr::select_interfaces(interfaces);
-    if (composite_devices > 1 || selection == psvr::Selection::ambiguous) {
+    if (composite_devices > 1 || control_nodes > 1 || selection == psvr::Selection::ambiguous) {
         log.write("ERROR", "ambiguous PSVR sensor/control interfaces; connect one processor unit only");
         return 3;
     }
-    if (!sensor_info || !sensor_info->path || !control_pnp) {
-        log.write("ERROR", "required PSVR interfaces missing: sensor=4 HID, control=5 PnP; check bindings/service");
+    if (!control_pnp) {
+        log.write("ERROR", "required PSVR control=5 PnP missing; check bindings/service");
         return 3;
     }
+    if (options.action == psvr::Action::none && (!sensor_info || !sensor_info->path)) {
+        log.write("ERROR", "capture requires PSVR sensor=4 HID; check bindings/service");
+        return 3;
+    }
+    psvr::DeviceSession ownership;
     std::unique_ptr<psvr::WinUsbControl> usb_control;
     if (_stricmp(control_pnp->service.c_str(), "WinUSB") == 0) {
         if (control_pnp->problem || control_pnp->status_result) {

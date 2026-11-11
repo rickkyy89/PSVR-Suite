@@ -1,0 +1,15 @@
+{
+  "schema": "psvr.camera.led_rig",
+  "version": 1,
+  "provenance": "external_ruler_estimate",
+  "source": "https://github.com/psmoveservice/PSMoveService/blob/22bbe20e9de53f3f3581137bce7b88e2587a27e7/src/psmoveservice/MorpheusHMD/MorpheusHMD.cpp#getTrackingShape",
+  "notes": "PSMoveService (Apache-2.0), getTrackingShape: author explicitly describes approximate ruler measurements, not factory calibration. Front subset indices 4,1,0,6,3; centimetres converted to metres. Model axes x image-right, y down, z into headset when front-facing. Origin at centre front LED, NOT anatomical head origin. Physical scale, depth and head lever arm unvalidated on this headset.",
+  "labels": ["upper_left", "upper_right", "centre", "lower_left", "lower_right"],
+  "object_points_m": [
+    [-0.08, -0.045, 0.025],
+    [0.08, -0.045, 0.025],
+    [0.0, 0.0, 0.0],
+    [-0.08, 0.045, 0.025],
+    [0.08, 0.045, 0.025]
+  ]
+}

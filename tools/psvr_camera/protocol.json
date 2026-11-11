@@ -1,0 +1,43 @@
+{
+  "protocol": "psvr.position",
+  "version": 1,
+  "transport": "udp",
+  "encoding": "utf-8 json, one object per datagram",
+  "default_endpoint": {
+    "host": "127.0.0.1",
+    "port": 4271
+  },
+  "frame": "psvr_world",
+  "units": "m",
+  "handedness": "right",
+  "axes": {
+    "right": "+X",
+    "up": "+Y",
+    "forward": "-Z"
+  },
+  "orientation_order": "WXYZ",
+  "orientation_convention": "world_from_body",
+  "states": ["ambiguous", "calibrating", "error", "lost", "tracking"],
+  "sources": ["aruco", "blob_led", "none"],
+  "position_key": "position_m",
+  "rotation_key": "orientation_wxyz",
+  "fields": {
+    "protocol": "constant string",
+    "version": "integer, this document's version",
+    "seq": "monotonic non-negative integer, per sender",
+    "host_time_ns": "sender wall clock in nanoseconds since epoch",
+    "monotonic_s": "sender monotonic seconds at capture time",
+    "valid": "boolean; false means pose not usable this frame",
+    "state": "one of states",
+    "source": "one of sources (measurement origin)",
+    "frame": "constant frame name",
+    "units": "constant unit string, metres",
+    "position_m": "[x, y, z] metres in frame, null when invalid",
+    "orientation_wxyz": "[w, x, y, z] world_from_body, null when unavailable",
+    "reprojection_px": "RMS reprojection error in pixels, null when unavailable",
+    "inliers": "number of accepted correspondences, null when unavailable",
+    "ambiguity_ratio": "planar PnP ambiguity metric, null when unavailable",
+    "note": "optional short human-readable reason, null when absent"
+  },
+  "driver_agent_todo": "The driver agent must confirm it listens on this endpoint and agrees with the psvr_world axes (+X right, +Y up, -Z forward) before the position stream is enabled. Position from the camera is a separate metric source from IMU orientation; neither is assumed calibrated."
+}

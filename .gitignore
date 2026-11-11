@@ -1,10 +1,64 @@
 /build/
 /out/
+/dist/
 /logs/*
 !/logs/.gitkeep
 /third_party/cache/
 /.toolchain/
 /.vs/
-*.user
+/.venv-camera/
+/.venv*/
 __pycache__/
 *.pyc
+*.pyo
+/.pytest_cache/
+%TEMP%/
+/configurations/psvr_suite_user.json*
+/configurations/psvr_suite_ui.json*
+/configurations/candidates/*.zip
+*.user
+*.suo
+*.sln.docstates
+/tools/psvr_pseye/.deps/
+/tools/psvr_pseye/build/
+/tools/psvr_pseye/out/
+/tools/psvr_camera/.deps/
+/tools/psvr_camera/build/
+/tools/psvr_camera/out/
+/docs/kalman_optimization_*.json
+*.log
+# OpenCode: temporanei Google Drive (2026-10-14)
+.tmp.driveupload/
+.tmp.drivedownload/
+**/.tmp.driveupload/
+**/.tmp.drivedownload/
+
+# Source-release scope: standalone session reports not referenced by retained docs.
+# Keep dated reports and review_261015.md that README/STATUS/docs/tests reference.
+/docs/AUDIO_LIVE_20261101.md
+/docs/BLUE_LED_TRIAL_20261010.md
+/docs/CAMERA_MODULAR_REVIEW_20261102.md
+/docs/CAMERA_PS4_LED_AUTHORIZED_STOP_20261107.md
+/docs/EVO_V2_LATERAL_TRIAL_20261015.md
+/docs/HEADSET_BUTTONS_LIVE_20261101.md
+/docs/IMU_LOSS_ANALYSIS_20261006.md
+/docs/LIVE_STEAMVR_BOTH_CAMERAS_20261101.md
+/docs/OFFLINE_REGRESSION_20261101.md
+/docs/PS4_STEREO_RIG_REFINEMENT_20261028.md
+/docs/PSEYE_NATIVE_REGRESSION_20261101.md
+/docs/SUITE_OPTICS_RESTART_FIX_20261014.md
+/docs/VIRTUAL_DISPLAY_TRIAL_20261009.md
+
+# One-shot diagnostics / local log housekeeping; no retained callers or tests.
+/scripts/activate_compositor_window.ps1
+/scripts/analyze_seated_capture.py
+/scripts/capture_seated_tracking.py
+/scripts/cleanup_old_trial_logs.py
+/scripts/diagnose_coherent_trial.py
+/scripts/inspect_v2_lateral_transition.py
+/scripts/session_storage_inventory.py
+/scripts/set_6dof_trial.ps1
+/scripts/replay_stereo_rig_refinement.py
+
+# Superseded nominal red-camera profile, used only by the excluded blue-LED report.
+/configurations/pseye_red_640x480_nominal.json

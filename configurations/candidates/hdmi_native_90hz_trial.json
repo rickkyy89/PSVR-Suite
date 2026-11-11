@@ -1,0 +1,138 @@
+{
+  "schema_version": 1,
+  "kind": "refresh90_trial_manifest",
+  "name": "PSVR1 native GPU HDMI 1080p90 desktop trial (prepared, never measured)",
+  "status": "prepared_unverified_90",
+  "session_id": "20261005",
+  "prepared_date_local": "2026-10-05",
+  "connection": "GPU native HDMI -> PSVR processor unit HDMI PS4 input",
+  "identity_note": "Same physical display as the 120 Hz candidate: the identity block below repeats only the monitor path and EDID pair already recorded for Sony SNY6A04; no 120 Hz evidence value is copied from configurations/candidates/hdmi_native_120hz.json.",
+  "trial_identity": {
+    "monitor_device_path": "\\\\?\\DISPLAY#SNY6A04#5&625d12c&1&UID4352#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}",
+    "edid_ids": {
+      "manufacturer": 55629,
+      "product": 27140
+    },
+    "edid_ids_representation": "Windows DISPLAYCONFIG edidManufactureId/edidProductCodeId as serialized by tools/psvr_display/display_inventory.cpp (inventory_json): Sony SNY measures 0xD94D (55629) little-endian-pair form and product 0x6A04 (27140); readiness.is_sony_edid_ids is the project's accepted-identity contract and the checker reuses it instead of re-deriving a representation.",
+    "identity_source": "Measured Sony records: 120 Hz candidate displayMonitorPath, scripts/native_direct_mode.ps1 (0xd94d/0x6a04 gate) and logs/steamvr_refresh_before_120hz_20261004.json. The historical SNYB403 profile identity is NOT adopted."
+  },
+  "desired_mode": {
+    "active_width": 1920,
+    "active_height": 1080,
+    "refresh": {
+      "numerator": 90,
+      "denominator": 1
+    },
+    "scan": "progressive",
+    "claim_note": "Desired trial target only. Nothing here claims the desktop, GPU, EDID or panel currently produces 90 Hz."
+  },
+  "planned_timing": {
+    "h_front_porch": 88,
+    "h_sync_width": 44,
+    "h_back_porch": 148,
+    "h_total": 2200,
+    "v_front_porch": 4,
+    "v_sync_width": 5,
+    "v_back_porch": 36,
+    "v_total": 1125,
+    "h_sync_polarity": "positive",
+    "v_sync_polarity": "positive",
+    "scan": "progressive",
+    "expected_pixel_clock_hz": 222750000,
+    "expected_horizontal_frequency_hz": 101250,
+    "arithmetic_note": "Refresh is derived as pixel_clock / (h_total * v_total) = 222750000 / (2200 * 1125) = exactly 90 Hz; horizontal frequency 101250 Hz = 101.25 kHz (the docs table writes 101,250 kHz in Italian decimal notation)."
+  },
+  "timing_provenance": {
+    "source_document": "docs/PSVR_HIGH_REFRESH_TEST.md, historical timing table (90 Hz column)",
+    "project_wiki_url": "https://github.com/gusmanb/PSVRFramework/wiki/Video-routing-and-EDIDs",
+    "reference_url": "https://github.com/gusmanb/PSVRFramework/files/605425/psvr_120.zip",
+    "reference_archive_sha256": "54574aae8e507ad7f3c5fe05437d003ce4ee0b426a0fa15300c48209cb740a08",
+    "historical_profile_id": "SNYB403",
+    "scope": "timing_only_not_identity",
+    "identity_adopted": false,
+    "tested_on_this_unit": false,
+    "notes": [
+      "The archived 256-byte EDID in that ZIP was analysed in memory only; it encodes 60/90/120 Hz timings in a modified profile, so the 90 Hz timing values are documented for the sample, not certified for this revision.",
+      "The historical SNYB403 profile changes the serial, removes the range-limits descriptor and raises the HDMI Maximum TMDS byte to 300 MHz: never import it wholesale over our SNY6A04 identity.",
+      "Documenting which timings were encoded proves nothing about the current chain accepting them at 90 Hz."
+    ]
+  },
+  "refresh_control": {
+    "control": "desktop refresh timing only (manual NVIDIA custom resolution at trial time)",
+    "method": "NVIDIA control panel > change resolution > customize > create custom resolution > manual timings from planned_timing; operator verifies target monitor and values before Test, per docs/PSVR_HIGH_REFRESH_TEST.md",
+    "applied": false,
+    "applied_by_this_manifest": false,
+    "note": "This manifest plans the trial; it applies nothing to the GPU, registry, runtime or hardware."
+  },
+  "edid_control": {
+    "control": "EDID advertisement, separate from refresh timing",
+    "edid_override_requested": false,
+    "edid_90_generator_requested": false,
+    "vic_1080p90": null,
+    "vic_note": "No CEA-861 VIC defines 1920x1080p90, and none is invented here. The trial deliberately touches only the refresh-timing control; EDID overrides, CRU and INF edits stay out of scope.",
+    "note": "Refresh and EDID are independent controls: passing or failing this trial says nothing about EDID advertisements, and vice versa."
+  },
+  "current_physical_validation": {
+    "path_refresh_measured": null,
+    "signal_refresh_measured": null,
+    "dimensions_measured": null,
+    "progressive_measured": null,
+    "identity_verified_on_trial": null,
+    "panel_cadence_verified": false,
+    "fullscreen_verified": false,
+    "runtime_session_verified": false,
+    "long_term_stability_verified": false,
+    "note": "Every physical field is null or false on purpose: 90 Hz has never been measured on this unit. A prepared manifest must not borrow the 120 Hz candidate's measurements."
+  },
+  "expected_runtime_changes": {
+    "manual_operator_steps_only": true,
+    "steamvr_override_keys": {
+      "driver_psvrpc.displayRefreshNumerator": 90,
+      "driver_psvrpc.displayRefreshDenominator": 1
+    },
+    "never_change_automatically": [
+      "power.pauseCompositorOnStandby (checked false already; untouched by this trial)",
+      "HMD power or configuration mode (WinUSB)",
+      "driver_psvrpc.displayMonitorPath",
+      "driver_psvrpc.displayEnabled",
+      "driver_psvrpc.displayX / displayY / displayWidth / displayHeight",
+      "any EDID registry override or GPU driver binding"
+    ],
+    "note": "Only the two refresh-rational keys are expected to change, and only after a verified 90 Hz desktop signal; no power or config-mode write is ever automatic."
+  },
+  "restore_pretrial": {
+    "keys": [
+      "driver_psvrpc.displayRefreshNumerator",
+      "driver_psvrpc.displayRefreshDenominator"
+    ],
+    "restore_to": "the two values actually saved in the live SteamVR configuration immediately before the trial, recorded in a fresh backup file at trial start; restore reads that recorded backup, never a hardcoded assumption",
+    "assumed_value_used": false,
+    "do_not_hardcode": [
+      "120/1 from configurations/candidates/hdmi_native_120hz.json (that is the previous candidate, not proof of the live pre-trial state)",
+      "60/1 from logs/steamvr_refresh_before_120hz_20261004.json (that backup predates later changes)"
+    ],
+    "nvidia_custom_mode": "If the trial fails, revert the NVIDIA selection to the mode actually present and selected before the trial (recorded at trial start, which may or may not be 60 Hz), only if it is still available and a re-check confirms its path/signal; then remove the 90 Hz custom mode only while it is not active. The documented original 60 Hz baseline is a fallback ONLY when the actual pre-trial mode cannot be recovered. Never assume 120 Hz and never assume a mode without verification.",
+    "scope": "SteamVR override restore only; the pre-trial backup governs the two refresh keys."
+  },
+  "evaluation_gate": {
+    "tool": "tools/psvr_native_analysis/refresh90_trial.py",
+    "input": "a saved `psvr_display --json` inventory artifact plus this manifest; the tool never runs psvr_display, never enumerates live displays and never uses subprocess",
+    "rationals": "path refresh and target signal_refresh must be positive-integer rationals whose exact cross-multiplied value is 90/1 (equivalent rationals such as 180/2 pass; the rounded hz field is never trusted)",
+    "fail_closed": "missing or malformed inventory fields yield unknown/blocked outcomes, never a fake pass",
+    "desktop_scope": "A positive outcome means only that the measured saved desktop inventory satisfies the 90 Hz desktop-branch gate; it makes no Direct Mode, panel-cadence or SteamVR claim."
+  },
+  "limitations": [
+    "prepared offline 2026-10-05: no 90 Hz mode was created, tested or measured by this work",
+    "the saved inventory bundles under logs/direct_readiness_20261005* show only the LG monitor on active desktop paths; the Sony HMD is currently hidden from the desktop, which blocks the DESKTOP branch of this trial only",
+    "desktop absence is not proof that a Direct Mode 90 Hz route would fail; direct evaluation needs other backend evidence (private enumeration / Display Core modes plus measured timing), and EDID or property values alone never prove either direction",
+    "the documented 90 Hz timings come from the historical SNYB403 profile sample; acceptance by the current GPU driver, HDMI chain and panel is unverified",
+    "the 120 Hz candidate's -202 fullscreen recurrence shows a working signal at one refresh does not certify stable runtime at any refresh"
+  ],
+  "related": {
+    "timing_table_doc": "docs/PSVR_HIGH_REFRESH_TEST.md",
+    "working_120_candidate": "configurations/candidates/hdmi_native_120hz.json",
+    "pre_120_refresh_backup": "logs/steamvr_refresh_before_120hz_20261004.json",
+    "inventory_contract_source": "tools/psvr_display/display_inventory.cpp",
+    "evidence_isolation": "no validation, artifact or runtime value from the 120 Hz candidate is reused as 90 Hz evidence"
+  }
+}

@@ -54,6 +54,13 @@ class ImuFusion {
     VectorStats calibration_first_{}, calibration_second_{};
     std::string calibration_error_;
     Vec3 bias_{}, gyro_{}, accel_{};
+    // Monotonic generation of the world reference. Bumped whenever reference_
+    // changes (any recenter, including the automatic one at calibration
+    // completion, and a calibration restart). The M9 position bridge uses it as
+    // the shared recenter epoch so a world-frame change always forces a new
+    // seated origin, and the epoch can never be observed with a mismatched
+    // world rotation.
+    unsigned world_epoch_ = 0;
 public:
     unsigned long long samples = 0, integrated = 0, duplicates = 0, gaps = 0, rollovers = 0;
     unsigned long long rejected = 0, recenter_count = 0, skipped_gravity = 0;
@@ -62,6 +69,8 @@ public:
     double max_quaternion_error = 0;
     explicit ImuFusion(ImuConfig c = {}) : config_(c) {}
     ImuState state() const { return state_; }
+    bool has_tick() const { return have_tick_; }
+    std::uint32_t previous_tick() const { return previous_tick_; }
     double elapsed_s() const { return static_cast<double>(elapsed_us_)*1e-6; }
     double calibration_elapsed_ms() const { return static_cast<double>(calibration_us_)*0.001; }
     Vec3 gyro() const { return gyro_; }
@@ -73,7 +82,16 @@ public:
     Vec3 calibration_mean_shift() const { return (calibration_second_.mean-calibration_first_.mean)*degrees; }
     const std::string& calibration_error() const { return calibration_error_; }
     Quaternion orientation() const { return (reference_.conjugate()*absolute_*head_offset_).normalized(); }
+    // Optical rigid-body matching needs the physical remapped sensor basis,
+    // before the right-hand neutral-head offset introduced by full recenter.
+    Quaternion sensor_orientation() const { return (reference_.conjugate()*absolute_).normalized(); }
     Quaternion output() const { return filtered_; }
+    // World-yaw reference applied by the last recenter: the rotation from the
+    // gravity-aligned sensor frame to the recentered world frame. The M9
+    // position bridge rotates the camera translation by this so a yaw recenter
+    // keeps position and orientation in the same frame.
+    Quaternion world_rotation() const { return reference_.conjugate(); }
+    unsigned world_epoch() const { return world_epoch_; }
     void mark_lost() { if (state_ != ImuState::calibration_failed) state_ = ImuState::lost; }
     void restart_calibration() {
         state_ = ImuState::warming;
@@ -82,9 +100,11 @@ public:
         calibration_gyro_ = {}; calibration_accel_ = {};
         calibration_first_ = {}; calibration_second_ = {}; calibration_error_.clear();
         bias_ = {}; absolute_ = {}; reference_ = {}; head_offset_ = {}; filtered_ = {};
+        ++world_epoch_; // reference_ reset to identity is a world-frame change
     }
     bool recenter() {
         if (state_ != ImuState::tracking) return false;
+        ++world_epoch_;
         // World heading is changed on the LEFT, neutral head/sensor alignment on
         // the RIGHT. A full inverse on the left would tilt world-up and turn
         // pure world yaw into apparent roll when the neutral sensor is pitched.

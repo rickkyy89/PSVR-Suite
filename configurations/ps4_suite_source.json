@@ -1,0 +1,13 @@
+{
+  "schema": "psvr.camera.suite_source",
+  "version": 1,
+  "source": "ps4-stereo",
+  "width": 640,
+  "height": 400,
+  "fps": 60,
+  "eye_order": ["right", "left"],
+  "calibration_path": "configurations/ps4_stereo_640x400_suite.json",
+  "rig_path": "configurations/psvr_front_leds_stereo_refined_20261028.json",
+  "detector": {"value_min": 160, "saturation_min": 90, "min_area": 20, "opening_size": 0},
+  "controls": {"brightness": 1, "exposure": -7, "gain": 8}
+}

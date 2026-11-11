@@ -1,0 +1,30 @@
+{
+  "filter": "kalman",
+  "prediction_output": "driver_hold",
+  "uncertainty": {
+    "depth_variance_factor": 2.0,
+    "depth_extra_std_m": 0.0
+  },
+  "kalman": {
+    "acceleration_std_m_s2": 3.0,
+    "adaptive_quiet": true,
+    "quiet_acceleration_std": 0.03,
+    "motion_onset_acceleration_std": 8.0,
+    "quiet_enter_s": 0.25,
+    "quiet_trend_window_s": 0.12,
+    "quiet_speed_enter_m_s": 0.03,
+    "quiet_speed_exit_m_s": 0.08,
+    "quiet_motion_sigma": 3.0,
+    "quiet_innovation_exit_chi2": 7.815,
+    "quiet_coherent_exit_chi2": 11.34,
+    "measurement_speed_noise_allowance_m": 0.015,
+    "recovery_velocity_fit": true,
+    "gate_chi2": 16.27,
+    "max_prediction_s": 0.08,
+    "max_gap_s": 0.25,
+    "max_speed_m_s": 2.0,
+    "max_position_std_m": 0.08,
+    "reliable_std_m": 0.04,
+    "recovery_confirmations": 4
+  }
+}

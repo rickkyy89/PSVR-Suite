@@ -16,7 +16,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 Lo script previsto verifica toolchain e piattaforma, configura CMake,
 compila, esegue CTest e installa il diagnostico in `out/diag/`.
 Il generator è `Visual Studio 17 2022`, architettura `-A x64`.
-La build MSVC sarà verificata solo quando VS 2022 è disponibile.
+Build MSVC verificata il 2026-10-06 con Build Tools 2022 17.14.41,
+MSVC 19.44.35229 e Windows SDK 10.0.26100.0.
+Il driver MSVC è staged separatamente in `out/driver_psvrpc_msvc/psvrpc`;
+MinGW conserva `out/driver_psvrpc/psvrpc`. Anche il preset `vs2022` seleziona
+lo staging separato. `-DriverPackageRoot <path>` permette uno staging esplicito.
+La registrazione SteamVR deve indicare il pacchetto che si vuole realmente provare.
+Risultati runtime e presenza diagnostica: [prova MSVC](docs/MSVC_RUNTIME_20261006.md).
 
 ## Toolchain portabile utilizzata in questa sessione
 
@@ -75,3 +81,56 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run_monitor.ps1
 
 `scripts/run_monitor.ps1` verifica `out/diag/psvr_diag.exe`, `config.json`
 e Tk prima di avviare; senza Python la build/test C++ resta valida.
+
+## Driver OpenVR M4
+
+La build include il target DLL `driver_psvrpc` e staging automatico
+`out/driver_psvrpc/psvrpc`. SDK OpenVR 2.15.6 fissato al commit
+`0924064316de3effbcd1acf1e309182a2deb1c05`, usato solo per header driver.
+`PSVR_BUILD_DRIVER=OFF` esclude driver e download SDK; per offline usare
+`FETCHCONTENT_SOURCE_DIR_OPENVR_SDK` con checkout di quel commit.
+La build non registra né attiva SteamVR. Dettagli e gate in
+[report M4](docs/MILESTONE_4_REPORT.md).
+
+## M5 display e test matematici M6
+
+La stessa build produce anche `psvr_display.exe`, inventario read-only Windows,
+nel package standalone `out/display/` e tramite install in `out/diag/`.
+La DLL include il componente display desktop-esteso ma resta disabilitato
+finché non sono forniti opt-in e settings espliciti verificabili. M6 include
+matematica pura, loader/adapter e validatore `out/optics/psvr_optics.exe`.
+La build genera pattern SVG stereo in `out/patterns/` e risorse driver quando
+Python 3.11 è disponibile; nessun pattern apre GUI o attiva display.
+Checkpoint M6: 28 CTest; nessun test automatico richiede USB, HDMI o SteamVR.
+Report [M5](docs/MILESTONE_5_REPORT.md) e
+[M6 software](docs/MILESTONE_6_SOFTWARE.md).
+
+## M9 posizione e PSEye
+
+La build principale aggiunge il bridge Winsock al driver e il probe standalone
+`out/position_probe/psvr_position_probe.exe`. Suite verificata **35/35 CTest**,
+inclusi UDP reale e interoperabilità Python → C++. La suite camera richiede
+NumPy nel Python scelto da CMake; se manca, configure lo segnala e non registra
+quel test opzionale. OpenCV resta opzionale per le prove geometriche offline.
+
+La camera ha una build separata, con upstream fissato e patch riproducibile:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File tools/psvr_pseye/build.ps1 -ToolchainBin "C:\Users\rickk\AppData\Local\Temp\opencode\w64devkit\bin"
+```
+
+Stage `out/pseye/`; nessun driver USB installato. `build.ps1 -NoUpstream`
+produce solo lo shim, non il backend funzionante completo. Per detection e
+calibrazione live usare la venv camera (già pronta su questo PC):
+
+```powershell
+python -m venv .venv-camera
+& ".venv-camera\Scripts\python.exe" -m pip install -r tools/psvr_camera/requirements-optional.txt
+$env:PYTHONPATH="tools"
+& ".venv-camera\Scripts\python.exe" -m psvr_camera pseye inventory
+& ".venv-camera\Scripts\python.exe" -B -m unittest discover -s tests -p "test_camera*.py"
+```
+
+Per usare la venv nei test CMake, scegliere esplicitamente
+`-DPython3_EXECUTABLE=<root>/.venv-camera/Scripts/python.exe`.
+Versioni verificate e gate fisici in [report sessione](docs/AUTONOMOUS_20261005.md).

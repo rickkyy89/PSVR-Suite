@@ -1,0 +1,54 @@
+{
+  "schema": "psvr.camera.led_rig",
+  "version": 1,
+  "provenance": "external_scale_monocular_refined_outline",
+  "source": "https://github.com/psmoveservice/PSMoveService/blob/22bbe20e9de53f3f3581137bce7b88e2587a27e7/src/psmoveservice/MorpheusHMD/MorpheusHMD.cpp#getTrackingShape",
+  "notes": "PSMoveService (Apache-2.0), getTrackingShape: author explicitly describes approximate ruler measurements, not factory calibration. Front subset indices 4,1,0,6,3; centimetres converted to metres. Model axes x image-right, y down, z into headset when front-facing. Origin at centre front LED, NOT anatomical head origin. Physical scale, depth and head lever arm unvalidated on this headset. Front heights and bottom width refined from recorded camera views at fixed intrinsics. Top width and depths retained from external estimate; physical scale/head origin not calibrated.",
+  "labels": [
+    "upper_left",
+    "upper_right",
+    "centre",
+    "lower_left",
+    "lower_right"
+  ],
+  "object_points_m": [
+    [
+      -0.08,
+      -0.05288222661924354,
+      0.025
+    ],
+    [
+      0.08,
+      -0.05288222661924354,
+      0.025
+    ],
+    [
+      0.0,
+      0.0,
+      0.0
+    ],
+    [
+      -0.07838395277729067,
+      0.053373439590696424,
+      0.025
+    ],
+    [
+      0.07838395277729067,
+      0.053373439590696424,
+      0.025
+    ]
+  ],
+  "refinement": {
+    "log": "logs/led_scale_preview_20261011.jsonl",
+    "intrinsics": "configurations/pseye_blue_640x480_calibrated.json",
+    "training_views": 24,
+    "heldout_views": 12,
+    "training_median_rms_px": 0.9651059307138712,
+    "heldout_before_median_rms_px": 2.8714618564975076,
+    "heldout_after_median_rms_px": 0.8393843433486181,
+    "heldout_after_max_rms_px": 2.3781319656317983,
+    "physical_scale_validated": false,
+    "fixed_top_width_m": 0.16,
+    "fixed_depth_reference": true
+  }
+}

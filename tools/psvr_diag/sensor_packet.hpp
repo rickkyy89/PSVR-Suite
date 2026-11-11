@@ -21,7 +21,21 @@ struct SensorPacket {
     std::uint8_t sequence;
     std::uint8_t status_raw;
     std::uint16_t ir_raw;
+    // MI_04 headset-input bytes (read-only parsing, never a USB command):
+    // byte0 = button bitmask, byte2 = volume level, byte8 = headset flags.
+    // Ground truth PSMoveService MorpheusHMD.cpp: byte0 VolumePlus=0x02,
+    // VolumeMinus=0x04, MicrophoneMute=0x08; byte8 bit0=worn, bit3=mic muted,
+    // bit4=headphones present. headset_flags_raw mirrors status_raw (byte8);
+    // kept as a named alias so call sites read intent, not offsets.
+    std::uint8_t buttons_raw = 0;
+    std::uint8_t volume_raw = 0;
+    std::uint8_t headset_flags_raw = 0;
     bool worn() const { return (status_raw & 1) != 0; }
+    bool volume_up() const { return (buttons_raw & 0x02) != 0; }
+    bool volume_down() const { return (buttons_raw & 0x04) != 0; }
+    bool mic_mute_pressed() const { return (buttons_raw & 0x08) != 0; }
+    bool mic_muted() const { return (headset_flags_raw & 0x08) != 0; }
+    bool headphones_present() const { return (headset_flags_raw & 0x10) != 0; }
 };
 
 inline std::uint32_t le32(const unsigned char* b) {
@@ -47,8 +61,15 @@ inline std::optional<SensorPacket> decode_sensor(const unsigned char* b, std::si
     result.sequence = b[63];
     // PSVRFramework PSVR.cs ccda7ca: worn = byte8 bit0, raw IR = LE16 at 55.
     // Byte8 bit1 display semantics conflict between references; expose raw only.
+    // IMU framing (samples at 16/32, seq at 63, IR at 55) is live-validated:
+    // do NOT shift it; the headset-input bytes below are parsed independently.
     result.status_raw = b[8];
     result.ir_raw = static_cast<std::uint16_t>(unsigned(b[55]) | (unsigned(b[56]) << 8));
+    // Read-only headset input (PSMoveService MorpheusHMD.cpp ground truth).
+    // Live gate: which bits actually toggle on press needs the user at return.
+    result.buttons_raw = b[0];
+    result.volume_raw = b[2];
+    result.headset_flags_raw = b[8];
     return result;
 }
 } // namespace psvr

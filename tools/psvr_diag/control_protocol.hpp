@@ -10,9 +10,10 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 namespace psvr {
-enum class Action { none, control_info, status, power_on, power_off, vr_mode, cinema_mode };
+enum class Action { none, control_info, status, power_on, power_off, vr_mode, cinema_mode, leds_on };
 inline const char* action_name(Action action) {
     switch (action) {
     case Action::none: return "passive";
@@ -22,6 +23,7 @@ inline const char* action_name(Action action) {
     case Action::power_off: return "power-off";
     case Action::vr_mode: return "vr-mode";
     case Action::cinema_mode: return "cinema-mode";
+    case Action::leds_on: return "leds-on";
     }
     throw std::runtime_error("invalid action");
 }
@@ -32,18 +34,28 @@ inline std::optional<Action> parse_action(const std::string& flag) {
     if (flag == "--power-off") return Action::power_off;
     if (flag == "--vr-mode") return Action::vr_mode;
     if (flag == "--cinema-mode") return Action::cinema_mode;
+    if (flag == "--leds-on") return Action::leds_on;
     return std::nullopt;
 }
 inline bool writes_command(Action a) {
-    return a == Action::power_on || a == Action::power_off || a == Action::vr_mode || a == Action::cinema_mode;
+    return a == Action::power_on || a == Action::power_off || a == Action::vr_mode || a == Action::cinema_mode || a == Action::leds_on;
 }
-inline std::array<unsigned char, 8> command_packet(Action action) {
+inline std::vector<unsigned char> command_packet(Action action) {
     if (!writes_command(action)) throw std::runtime_error("action has no documented command packet");
+    if (action == Action::leds_on) {
+        // PSVRFramework Report-0x15---LED-Brightness: LE16 mask, nine
+        // intensities 0..100, five reserved bytes. Explicitly select all LEDs.
+        std::vector<unsigned char> packet(20, 0);
+        packet[0] = 0x15; packet[2] = 0xaa; packet[3] = 16;
+        packet[4] = 0xff; packet[5] = 0x01;
+        for (std::size_t i = 6; i < 15; ++i) packet[i] = 100;
+        return packet;
+    }
     const bool power = action == Action::power_on || action == Action::power_off;
     const bool enabled = action == Action::power_on || action == Action::vr_mode;
     // libpsvr gp_id=0; full Sony header + LE32 boolean payload, no HID prefix.
-    return {{static_cast<unsigned char>(power ? 0x17 : 0x23), 0x00, 0xaa, 0x04,
-             static_cast<unsigned char>(enabled ? 1 : 0), 0x00, 0x00, 0x00}};
+    return {static_cast<unsigned char>(power ? 0x17 : 0x23), 0x00, 0xaa, 0x04,
+             static_cast<unsigned char>(enabled ? 1 : 0), 0x00, 0x00, 0x00};
 }
 struct ControlStatus {
     std::uint8_t mask;
