@@ -240,7 +240,8 @@ credentials, no push to remote GitHub):
 Verification steps: run the suite `-Check` flag, preview the camera tab,
 and run the calibration routine from `cli.py`. The profile is local only;
 `psvr_suite_user.json` is not committed to GitHub.
-Donations are voluntary and optional via PayPal to rickkyy89@proton.me.
+Donations are voluntary and optional via PayPal:
+[paypal.me/rickkyy89](https://paypal.me/rickkyy89).
 See [docs/DONATIONS.md](docs/DONATIONS.md).
 Dependency licences (BSL-1.0 decoder, HIDAPI BSD, JSON MIT, OpenVR
 BSD, PS3 Eye backend GPL notes): [third_party/README.md](third_party/README.md).

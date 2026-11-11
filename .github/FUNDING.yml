@@ -1,6 +1,7 @@
 # GitHub funding for PSVR Suite.
 #
-# Donations are voluntary and optional via PayPal to rickkyy89@proton.me.
+# Donations are voluntary and optional via PayPal:
+# https://paypal.me/rickkyy89
 # All functions stay free (see docs/DONATIONS.md).
 #
-custom: ["mailto:rickkyy89@proton.me"]
+custom: ["https://paypal.me/rickkyy89"]
