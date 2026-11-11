@@ -61,7 +61,7 @@ Copyright (c) 2026 rickkyy. Licenza MIT — vedi [LICENSE](LICENSE).
     presenti; il movimento e la robustezza non sono certificati.
     Vedi [docs/PS4_CAMERA.md](docs/PS4_CAMERA.md).
   - **Licenza/donazioni:** MIT, funzioni gratis per tutti; donazioni
-    volontarie PayPal (nessun link pubblicato, vedi
+    volontarie via PayPal a rickkyy89@proton.me (vedi
     [docs/DONATIONS.md](docs/DONATIONS.md)).
   - **Verifica release:** build e 63/63 CTest superati anche dall'archivio
     estratto in una cartella pulita; verifiche e pacchettizzazione in
